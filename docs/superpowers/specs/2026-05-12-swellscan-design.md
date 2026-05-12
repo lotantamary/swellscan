@@ -287,6 +287,8 @@ The MALICIOUS / SUSPICIOUS split happens *after* the LLM contributes its evidenc
 
 Estimated LLM-invocation rate: ~40% of scans (60% are clear SAFE and short-circuit). Thresholds live in `scoring/policy.py` — tunable in one place.
 
+**Optional correlation bonuses (Day-3 stretch, see §12.1).** After the linear sum but before threshold comparison, an optional `apply_correlation_bonuses()` pass adds modest fixed bonuses (+10 to +20 points) when specific signal-sets co-occur — e.g. `{lookalike_domain, url_known_malicious, spf_fail}` → +15. Hand-curated, ~5 rules, all defined in `scoring/policy.py`. No exponential math, no rules DSL, no ML — just a lookup table. The architectural reason this slots in cleanly: the aggregator is a pure function of the evidence list; adding the bonus is one extra step in that one function, with zero changes to detectors, models, or the pipeline. If the stretch isn't reached, the linear sum is already a strong scoring policy on its own.
+
 ---
 
 ## 6. The detectors (seven)
@@ -396,8 +398,23 @@ Coastal Modern. Light cream background. Palette from upwind.io: cream `#FBF6EC`,
 
 **Tactical option if we want extra brand presence:** render a small "Swellscan" wordmark in Fraunces as a separate small image (~30px tall), embedded as a second Image widget below the hero. Considered, but probably overkill — the hero illustration already carries enough identity.
 
-### 8.2 — Card structure
-1. **Hero illustration** (backend-generated SVG, ~150px tall, full card width) — the wave + scene
+### 8.2 — Card states and structure
+
+The card renders in **two distinct states**:
+
+#### Scanning state (rendered immediately on icon click)
+
+A loading card displayed while the backend request is in flight (typical: 0.5–3 seconds). Without this, the user faces 1–3 seconds of unchanged sidebar after clicking Swellscan — the demo will look frozen for that window.
+
+Layout:
+- **Hero illustration in "scanning" variant** — the wave SVG with a subtle pulsing glow on the wave's crest (rendered server-side as a single static frame; we don't animate inside the card)
+- **"Analyzing this message…"** title in DM Sans
+- **Subtitle**: "checking authentication, links, attachments…" — establishes that work is happening
+- **Implementation**: `onGmailMessageOpen` returns this card immediately; a `Universal Action` (or `Action.RUN_FUNCTION` with auto-dispatch) fires on display, makes the HTTPS call, and the action callback returns the verdict card. If the auto-dispatch pattern proves fragile in Apps Script testing, fallback is a `Notification` toast ("Scanning...") at the bottom of Gmail — less prominent, still better than silence.
+
+#### Verdict state (rendered after scan completes)
+
+1. **Hero illustration** (backend-generated SVG, ~150px tall, full card width) — the wave + scene in SAFE/SUSPICIOUS/MALICIOUS variant
 2. **Score + verdict label** row
 3. **Subject + sender** one-line
 4. **Plain-language summary** (1-2 sentences)
@@ -534,7 +551,9 @@ On Day 3-4, populate the demo account's `UserProperties` with synthetic sender h
 | Stretch | When attempted | Cost | Cut criterion |
 |---|---|---|---|
 | Animated GIF wave (replace static SVG hero image) | Day 3 if extra hour | 1-2h | Fall back to static if any Gmail client mangles it |
+| **Correlation engine** (3-5 hand-curated signal-set bonuses in `scoring/policy.py`) | Day 3 after baseline detector is solid | 2-3h | Skip if Day 3 runs over; linear scoring stands on its own |
 | Threat-research scan (internet sweep for missed attack vectors) | Late Thu / Fri morning | ~90 min | Skip only if Day 4 is on fire |
+| Scalability note in README (per-user cost projection at 1 / 1K / 100K users + mitigations) | Day 4 README polish | ~30 min | Almost always shipped; near-zero cost |
 
 ### 12.2 — Future work (README "what I'd do with more time" section)
 
@@ -564,10 +583,11 @@ Cut from **lowest-impact** to **highest-impact**:
 | Order | Item | Type | Why this position |
 |---|---|---|---|
 | 1 | **Animated GIF experiment** | stretch | Free to skip; was always a "ship-if-it-works" experiment |
-| 2 | **Threat-research scan** | stretch | Only cut if Friday is genuinely on fire |
-| 3 | **`sender` detector** (lookalike domains) | v1 detector | "Would add brand-impersonation detection with more time" is a clean answer |
-| 4 | **`attachments` detector** (file types + hashes) | v1 detector | "Would add sandbox detonation with more time" is a clean answer |
-| 5 | **Per-sender baseline** | v1 detector (newest) | Last to cut — it's the wow moment |
+| 2 | **Correlation engine** | stretch | Linear scoring already produces strong verdicts without bonuses |
+| 3 | **Threat-research scan** | stretch | Only cut if Friday is genuinely on fire |
+| 4 | **`sender` detector** (lookalike domains) | v1 detector | "Would add brand-impersonation detection with more time" is a clean answer |
+| 5 | **`attachments` detector** (file types + hashes) | v1 detector | "Would add sandbox detonation with more time" is a clean answer |
+| 6 | **Per-sender baseline** | v1 detector (newest) | Last to cut — it's the wow moment |
 | **Never** | **README polish, manual test pass, submission itself** | | These don't get cut |
 
 This ordering preserves the most-impactful demo moments. We cut things we can defend the absence of.
