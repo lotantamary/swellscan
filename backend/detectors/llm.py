@@ -1,0 +1,63 @@
+import json
+
+from backend.clients.anthropic import AnthropicClient
+from backend.detectors.base import Detector
+from backend.models.email import Email
+from backend.models.evidence import Evidence, Severity, Signal
+
+
+class LLMDetector(Detector):
+    name = "llm"
+
+    def __init__(self, client: AnthropicClient | None = None):
+        self._client = client or AnthropicClient()
+
+    async def run_with_evidence(
+        self, email: Email, prior_evidence: list[Evidence]
+    ) -> list[Evidence]:
+        evidence_json = json.dumps(
+            [e.model_dump(mode="json") for e in prior_evidence]
+        )
+        metadata = json.dumps(
+            {
+                "from_address": email.from_.address,
+                "display_name": email.from_.display_name,
+                "subject": email.subject,
+                "urls_in_body": email.urls_in_body[:20],
+                "has_attachments": bool(email.attachments),
+            }
+        )
+        verdict = await self._client.analyze(
+            evidence_json=evidence_json,
+            email_metadata=metadata,
+            body=email.body.text,
+        )
+        if not verdict:
+            return []
+        if verdict.verdict == "malicious":
+            sig, sev = Signal.LLM_HIGH_RISK_PATTERN, Severity.HIGH
+        elif verdict.verdict == "suspicious":
+            sig, sev = Signal.LLM_SUSPICIOUS_PATTERN, Severity.MEDIUM
+        else:
+            sig, sev = Signal.LLM_BENIGN_JUDGMENT, Severity.INFO
+        return [
+            Evidence(
+                signal=sig,
+                severity=sev,
+                confidence=verdict.confidence,
+                explanation=verdict.reasoning,
+                mitre_techniques=(
+                    ["T1566", "T1656"]
+                    if sig != Signal.LLM_BENIGN_JUDGMENT
+                    else []
+                ),
+                details={
+                    "matched_patterns": verdict.matched_patterns,
+                    "should_warn_user": verdict.should_warn_user,
+                },
+                detector=self.name,
+            )
+        ]
+
+    async def run(self, email: Email) -> list[Evidence]:
+        return await self.run_with_evidence(email, [])
