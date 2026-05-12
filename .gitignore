@@ -1,0 +1,41 @@
+# --- Secrets (never commit these) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*-credentials.json
+service-account*.json
+client_secret*.json
+
+# --- Node / Apps Script tooling ---
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+.npm/
+.clasp.json
+.clasprc.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+env/
+*.egg-info/
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
