@@ -25,6 +25,7 @@ def make_email(
     sender_history: SenderHistory | None = None,
     sender_ip: str = "209.85.220.42",
     message_id: str = "msg-001",
+    message_id_header: str = "<msg-001@example.com>",
 ) -> Email:
     return Email(
         message_id=message_id,
@@ -37,6 +38,7 @@ def make_email(
             return_path=return_path,
             reply_to=reply_to,
             x_originating_ip=sender_ip,
+            message_id_header=message_id_header,
         ),
         body=EmailBody(text=body_text, html=body_html),
         urls_in_body=urls or [],
