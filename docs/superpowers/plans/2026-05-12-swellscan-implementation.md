@@ -93,24 +93,32 @@ swellscan/
 
 ---
 
-## Skills & tools — when each gets invoked
+## Skills & tools — when each gets invoked, and in what mode
 
-Tracking which skill/plugin activates at which phase. Each row maps to specific tasks below.
+Each row tells you: **which** skill/plugin, **where** it activates in the plan, **how** to execute it (inline in the main session vs. dispatched to a subagent for fresh-eyes review), and **why**.
 
-| Phase | Skill / Plugin | Used in | Why |
-|---|---|---|---|
-| Design (done) | `superpowers:brainstorming` | Pre-plan | Forced problem exploration before code |
-| This plan (done) | `superpowers:writing-plans` | — | Turned the spec into numbered tasks |
-| Backend code (TDD discipline) | `superpowers:test-driven-development` | Tasks 2–17 (built into every detector + scoring step) | Tests first; minimal implementation; refactor |
-| LLM wiring | `claude-api` | Task 14 step 0 | Best-practice Anthropic SDK patterns: prompt caching, structured output, model IDs |
-| Gmail Add-on UI | `frontend-design:frontend-design` | Task 25 step 0, Task 26 step 0 | Keeps card design from looking like generic AI-slop |
-| Before claiming "done" | `superpowers:verification-before-completion` | Gate after Tasks 20, 28, 31, 32 | "I watched it work" beats "I think it works" |
-| Live add-on testing | `chrome-devtools-mcp:chrome-devtools` | Task 28 step 0 | Drive a real browser to verify the Add-on actually renders |
-| Mid-build cleanup | `simplify` + `code-review:code-review` | Task 31.5 (between phases 5 and 6) | Lean code, catch issues before security review |
-| Right before submit | `security-review` | Task 32 | Final security pass — the rubric item Upwind cares about most |
-| End of project | `superpowers:finishing-a-development-branch` | Task 39 (after submit) | Structured handoff: clean repo, polish, decide next steps |
+**Hybrid execution rule:**
+- **Inline** for *build* work (you write code, run tests, deploy — needs conversational continuity with the user)
+- **Subagent** for *judge* work (code review, security review, threat research — outside perspective is the whole point)
 
-**Execution mode:** for a 4-day timebox with frequent user check-ins, **inline execution** (per `superpowers:executing-plans`) is the recommended mode over subagent-driven. Commit + push after every task; user review at each phase boundary.
+| Phase | Skill / Plugin | Used in | Mode | Why |
+|---|---|---|---|---|
+| Design (done) | `superpowers:brainstorming` | Pre-plan | inline | Forced problem exploration before code |
+| This plan (done) | `superpowers:writing-plans` | — | inline | Turned the spec into numbered tasks |
+| Backend code (TDD discipline) | `superpowers:test-driven-development` | Tasks 2–17 (built into every detector + scoring step) | inline | Tests first; minimal implementation; refactor |
+| LLM wiring | `claude-api` | Task 14 step 0 | inline | Best-practice Anthropic SDK patterns: prompt caching, structured output, model IDs |
+| Gmail Add-on UI | `frontend-design:frontend-design` | Task 25 step 0 | inline | Keeps card design from looking like generic AI-slop |
+| Before claiming "done" | `superpowers:verification-before-completion` | Gate after Tasks 20, 28, 31, 32 | inline | "I watched it work" beats "I think it works" |
+| Live add-on testing | `chrome-devtools-mcp:chrome-devtools` | Task 28 step 0 | inline | Browser automation needs interactive flow with the user |
+| Mid-build cleanup (lean code) | `simplify` | Task 31.5 step 1 | inline | We wrote the code; we discuss findings together |
+| **Mid-build cleanup (review)** | `code-review:code-review` | Task 31.5 step 2 | **subagent** | Fresh eyes on the diff — the *whole point* of code review |
+| **Threat-research scan** | general-purpose research agent | Task 33 | **subagent** | "What did we miss?" — no prior commitment bias to defend |
+| **Right before submit** | `security-review` | Task 32 step 2 | **subagent** | Final security pass; outsider catches what the author would instinctively defend |
+| End of project | `superpowers:finishing-a-development-branch` | Task 39 | inline | Structured handoff is interactive |
+
+**When dispatching a subagent:** brief it with the project context (point at CLAUDE.md + the design doc + the relevant code/diff), state the specific question or audit goal, ask for a short report. Don't have it duplicate work the inline session is already doing. See `superpowers:dispatching-parallel-agents` for the dispatch pattern.
+
+**Default execution skill:** `superpowers:executing-plans` (inline mode, checkpoints at phase boundaries). Commit + push after every task; the human reviews at each phase boundary.
 
 ---
 
