@@ -39,3 +39,6 @@ desktop.ini
 *.swp
 *.swo
 *~
+
+# --- Superpowers brainstorming companion (visual mockups, not source) ---
+.superpowers/
