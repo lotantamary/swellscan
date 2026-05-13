@@ -12,6 +12,20 @@ DKIM_PATTERN = re.compile(
 )
 DMARC_PATTERN = re.compile(r"dmarc=(pass|fail|bestguesspass|none)", re.I)
 
+# V2.S3a: known freemail domains. Corporate-From + freemail-Reply-To = strong
+# BEC indicator. TODO (future cleanup): consolidate with FREEMAIL set in
+# sender.py into a shared constants module.
+FREEMAIL_DOMAINS = {
+    "gmail.com",
+    "outlook.com",
+    "yahoo.com",
+    "hotmail.com",
+    "icloud.com",
+    "proton.me",
+    "aol.com",
+    "live.com",
+}
+
 
 class HeadersDetector(Detector):
     name = "headers"
@@ -76,19 +90,51 @@ class HeadersDetector(Detector):
                 )
             )
 
+        # V2.S3a: severity-scaled Reply-To handling. Freemail Reply-To from a
+        # corporate sender is the dominant 2025 BEC pattern (Verizon DBIR,
+        # Doppel, Proofpoint). Subdomain Reply-To is legitimate and no longer
+        # falsely flagged (fixes a V1 over-fire).
         if email.headers.reply_to:
             from_domain = email.from_.address.split("@", 1)[-1].lower()
             reply_domain = (
-                email.headers.reply_to.split("@", 1)[-1].lower().rstrip(">")
+                email.headers.reply_to.split("@", 1)[-1]
+                .lower()
+                .rstrip(">")
+                .strip()
             )
-            if reply_domain and reply_domain != from_domain:
+            domains_differ = bool(reply_domain) and reply_domain != from_domain
+            is_subdomain = bool(reply_domain) and (
+                reply_domain.endswith("." + from_domain)
+                or from_domain.endswith("." + reply_domain)
+            )
+            if domains_differ and not is_subdomain:
+                if (
+                    reply_domain in FREEMAIL_DOMAINS
+                    and from_domain not in FREEMAIL_DOMAINS
+                ):
+                    severity, confidence = Severity.HIGH, 0.9
+                    explanation = (
+                        f"Reply-To points to a personal email account "
+                        f"({reply_domain}) while sender domain is "
+                        f"{from_domain} - common BEC pattern."
+                    )
+                else:
+                    severity, confidence = Severity.MEDIUM, 0.8
+                    explanation = (
+                        f"Reply-To domain ({reply_domain}) does not match "
+                        f"From domain ({from_domain})."
+                    )
                 out.append(
                     self._ev(
                         Signal.REPLY_TO_DOMAIN_MISMATCH,
-                        Severity.MEDIUM,
-                        0.8,
-                        f"Reply-To domain ({reply_domain}) does not match From domain ({from_domain}).",
+                        severity,
+                        confidence,
+                        explanation,
                         mitre=["T1566"],
+                        details={
+                            "from_domain": from_domain,
+                            "reply_domain": reply_domain,
+                        },
                     )
                 )
 
