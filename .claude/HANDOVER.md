@@ -164,8 +164,12 @@ Specifically NOT in scope to change (these are LOCKED):
 
 How to approach this:
   - Before writing any visual code, set aside the planned implementation in the design spec and Task 25's planned `render.gs`. Think first about *what would actually be excellent here* — what would make the recruiter remember this card vs. the next candidate's.
-  - Bring me 2–3 concrete directions (with rationale tied to the rubric — creativity, product thinking) BEFORE writing. Wait for me to pick one.
+  - **WAIT for me to provide visual references** (screenshots of UIs I find compelling — Gmail add-ons, security dashboards, banking fraud-alert screens, etc.). I will paste these into the chat when Task 25 begins. **Do not propose design directions until you've seen my references.** Designing against concrete references > designing against your training-data prior. If I haven't given you references by the time you reach Task 25 Step 0, ASK for them — don't charge ahead with vibes-based proposals.
+  - After seeing the references, propose 2–3 directions that EXPLICITLY incorporate elements from them, with rationale tied to rubric items (creativity, product thinking). Wait for me to pick one. THEN write code.
+  - During Task 25 and Task 28, **use `chrome-devtools-mcp:chrome-devtools`** to render the actual Add-on in Gmail, screenshot the live card, and iterate visually. React to the rendered thing, not to the code. CardService is constrained enough that small visual tweaks compose to a noticeably better card — burn that iteration loop hard.
   - The goal is "make it better," not "faithfully reproduce the spec."
+
+**I may add additional skills or MCP plugins** specifically to help with the design work (Figma MCP, image-analysis helpers, dedicated design-system tools, etc.). If new skills appear in your available-skills list mid-session that you didn't have at orientation, that's me adding them — read their descriptions and use them as the situation calls for. Conversely, if you think a specific skill or plugin WOULD materially help and isn't currently installed, **say so** — propose what would help and I'll evaluate adding it.
 
 Treat improvements that help the demo or interview narrative as wins, not deviations.
 

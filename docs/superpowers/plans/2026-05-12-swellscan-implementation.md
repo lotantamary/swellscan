@@ -2603,9 +2603,12 @@ git commit -m "feat(addon): HTTP client with OIDC + payload builder from current
 
   Required flow:
   1. Set aside the design-spec UI section and the planned code below.
-  2. Think about what would actually be excellent for this card — what makes the recruiter remember Swellscan over the next candidate's project.
-  3. Bring the user 2–3 concrete directions (with rationale tied to rubric items — creativity, product thinking, security awareness) BEFORE writing any code.
-  4. Wait for the user to pick one. THEN write it.
+  2. **Wait for the user to provide visual references** (screenshots of UIs they find compelling — Gmail add-ons, security dashboards, etc.). If references aren't already in the chat by the time you reach this step, **ASK FOR THEM** before proposing anything.
+  3. After seeing references, propose 2–3 directions that explicitly incorporate elements from them, with rationale tied to rubric items (creativity, product thinking, security awareness).
+  4. Wait for the user to pick one. THEN write code.
+  5. Use `chrome-devtools-mcp:chrome-devtools` to render the actual card in Gmail and iterate visually — react to the rendered thing, not the code.
+
+  Note: the user may install additional design-focused skills/plugins mid-session (e.g., Figma MCP, image-analysis tools). Watch for new entries in your available-skills list. You may also proactively suggest installing one if a specific tool would materially help.
 
   In-scope for redesign: information hierarchy, layout, copy, typography, color, the visual "character arc" across SAFE/SUSPICIOUS/MALICIOUS, even the wave metaphor itself if a better one exists.
 
