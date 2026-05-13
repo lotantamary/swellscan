@@ -20,6 +20,17 @@ const PALETTE = {
 
 const SEVERITY_RANK = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1, 'info': 0 };
 
+// Per-severity dot color, matching the palette in addon/design-refs/.
+const SEVERITY_COLORS = {
+  critical: '#b8442b',  // coral (high tier)
+  high:     '#b8442b',  // coral
+  medium:   '#d49a3f',  // amber
+  low:      '#6e9c87',  // sage
+};
+function severityColor(severity) {
+  return SEVERITY_COLORS[String(severity || 'low').toLowerCase()] || '#6e9c87';
+}
+
 /**
  * Build the verdict card from an enriched Verdict object. The card is the
  * single source of truth for what the user reads about this scan.
@@ -99,37 +110,26 @@ function buildVerdictCard(verdict) {
     );
     findings.forEach(function (e) {
       const mitre = (e.mitre_techniques || []).join(', ');
-      const dotUrl = getBackendUrl() + '/dot/' + String(e.severity || 'low').toLowerCase();
+      const dotColor = severityColor(e.severity);
 
-      // Main text holds the human-readable signal name + (optional) MITRE
-      // technique id inline. The severity is communicated by the dot
-      // color alone, so we deliberately do NOT repeat it as text in a
-      // top label - that was redundant in the first install.
-      const titleText = prettySignal(e.signal) + (mitre ? ' · ' + mitre : '');
+      // Inline colored bullet at the start of the title. Unicode BLACK
+      // CIRCLE (&#9679;) renders at the text's font size - small, always
+      // round, palette-colored via <font color>. We deliberately avoid
+      // setStartIcon(IconImage) here because CardService gives that slot
+      // a fixed ~40px frame we cannot shrink, and the circle-crop enum
+      // proved unreliable across Apps Script versions. The inline
+      // bullet is the lightest-weight approach that always works.
+      const titleHtml =
+        '<font color="' + dotColor + '">&#9679;</font>  ' +
+        escapeHtml(prettySignal(e.signal)) +
+        (mitre ? ' &middot; ' + escapeHtml(mitre) : '');
 
-      const widget = CardService.newDecoratedText()
-        .setText(titleText)
-        .setBottomLabel(truncate(e.explanation || '', 200))
-        .setWrapText(true);
-
-      // Severity dot via setStartIcon(IconImage). Apps Script has used
-      // different method names for the circle-crop control across
-      // versions: setImageType in older docs, setImageStyle in newer.
-      // Try both with the ImageStyle.CIRCLE enum. If neither works the
-      // dot renders as a colored square - still a clear severity
-      // indicator, just with sharper corners.
-      const iconImage = CardService.newIconImage()
-        .setIconUrl(dotUrl)
-        .setAltText(String(e.severity || 'severity'));
-      const cropAttempts = [
-        function () { iconImage.setImageType(CardService.ImageStyle.CIRCLE); },
-        function () { iconImage.setImageStyle(CardService.ImageStyle.CIRCLE); },
-      ];
-      for (let i = 0; i < cropAttempts.length; i++) {
-        try { cropAttempts[i](); break; } catch (err) { /* try next */ }
-      }
-      widget.setStartIcon(iconImage);
-      section.addWidget(widget);
+      section.addWidget(
+        CardService.newDecoratedText()
+          .setText(titleHtml)
+          .setBottomLabel(truncate(e.explanation || '', 200))
+          .setWrapText(true)
+      );
     });
     card.addSection(section);
   }
