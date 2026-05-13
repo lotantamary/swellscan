@@ -399,40 +399,54 @@ Coastal Modern. Light cream background. Palette from upwind.io: cream `#FBF6EC`,
 
 **Tactical option if we want extra brand presence:** render a small "Swellscan" wordmark in Fraunces as a separate small image (~30px tall), embedded as a second Image widget below the hero. Considered, but probably overkill — the hero illustration already carries enough identity.
 
-### 8.2 — Card states and structure
+### 8.2 - Card flow and structure (revised 2026-05-13)
 
-The card renders in **two distinct states**:
+**Single state, auto-scan on icon click.** The original spec had a two-state flow (Scanning card -> Verdict card), but during the Task 25 design pass we confirmed CardService does not support fire-and-update-later patterns: a card cannot auto-trigger an action when it displays, only on user click. The "auto-dispatch" pattern this section originally proposed is not buildable in vanilla Apps Script.
 
-#### Scanning state (rendered immediately on icon click)
+**Final flow (Option A):**
 
-A loading card displayed while the backend request is in flight (typical: 0.5–3 seconds). Without this, the user faces 1–3 seconds of unchanged sidebar after clicking Swellscan — the demo will look frozen for that window.
+1. User opens an email in Gmail (Gmail's normal UI).
+2. User clicks the Swellscan icon in Gmail's right sidebar. This is the explicit user-initiated trigger.
+3. `onGmailMessageOpen` fires and runs the scan inline: build payload from `GmailApp`, POST to `/score` with the OIDC token, await the verdict.
+4. Gmail's default sidebar loading indicator (a thin pulsing bar at the top of the sidebar) is visible during the 1-3 second wait. We do not control this animation and cannot replace it with a custom spinner.
+5. When the scan returns, the verdict card is rendered.
 
-Layout:
-- **Hero illustration in "scanning" variant** — the wave SVG with a subtle pulsing glow on the wave's crest (rendered server-side as a single static frame; we don't animate inside the card)
-- **"Analyzing this message…"** title in DM Sans
-- **Subtitle**: "checking authentication, links, attachments…" — establishes that work is happening
-- **Implementation**: `onGmailMessageOpen` returns this card immediately; a `Universal Action` (or `Action.RUN_FUNCTION` with auto-dispatch) fires on display, makes the HTTPS call, and the action callback returns the verdict card. If the auto-dispatch pattern proves fragile in Apps Script testing, fallback is a `Notification` toast ("Scanning...") at the bottom of Gmail — less prominent, still better than silence.
+**Rationale for auto-scan over a two-click "Ready to Scan" intermediate card:**
+- Industry norm for security tools: Microsoft Defender for Office 365, Proofpoint, Mimecast, and Gmail's own phishing warnings all auto-scan. Productivity Add-ons (Slack, Salesforce-for-Gmail) require a click; security Add-ons do not.
+- Aligns with Upwind's published "runtime-first / automatic" philosophy.
+- Consent is given at install time (the user grants Gmail read scope through Google's standard OAuth consent screen and clicks the Swellscan icon to open the sidebar). A button click in between adds friction without adding consent.
+- 1-3 seconds reads as "tool loading" after an icon click; the same 1-3 seconds would read as "broken" after a button click labeled "Scan."
 
-#### Verdict state (rendered after scan completes)
+**Verdict card layout (final, locked):**
 
-1. **Hero illustration** (backend-generated SVG, ~150px tall, full card width) — the wave + scene in SAFE/SUSPICIOUS/MALICIOUS variant
-2. **Score + verdict label** row
-3. **Subject + sender** one-line
-4. **Plain-language summary** (1-2 sentences)
-5. **Findings list** — each row: severity dot + signal name + MITRE technique pill
-6. **Primary action button** ("Report & delete" for MALICIOUS, "See all evidence" for SUSPICIOUS, "Mark as expected" for SAFE)
-7. **Metadata footer**: latency, whether LLM was invoked
+1. Hero illustration: a 2:1 PNG of the three-state coastal scene (lifeguard relaxed / vigilant with binoculars / thrown by wave). Served by the backend at `/illustration/{label}`. Full card width.
+2. Verdict line: `LABEL  -  N / 100` in bold + palette color (sage / amber / coral). Default Roboto, default size - CardService does not allow custom font sizing in text widgets.
+3. Meta line (single row): `XXX conf - N detectors - LLM consulted` (or `LLM not needed` when SAFE short-circuits the LLM).
+4. Subject + sender: subject in bold, sender in muted grey. Truncate subject to ~80 chars.
+5. Summary: bold palette-colored opener (one sentence, trailing punctuation stripped) followed by `<br>` and then italic body. The colored opener carries the lifeguard voice ("All clear, you can paddle" / "Something off about this set" / "Out of the water on this one").
+6. Findings header: `FINDINGS: N signals detected`, count colored to state palette.
+7. Findings list: top 5 evidence items, sorted DESC by severity then DESC by confidence. Each row is a `DecoratedText` with a palette-colored severity dot icon (served from backend at `/dot/{severity}`).
+8. Fixed-footer action button: palette-colored, per state - sage `Mark as expected`, amber `See all evidence`, coral `Report & delete`. Buttons are wired with stub handlers that return lifeguard-voice notification toasts (see plan Task 26 and stretch Task 36.5).
 
-### 8.3 — The wave illustration (the "wow" image)
-Generated dynamically by `backend/illustration/wave.py`. Inputs: verdict label + score. Outputs: SVG bytes served as an image URL.
+**Brand discipline:** the visual identity lives entirely in the hero PNG and the consistent palette across verdict label / summary opener / findings count / action button / severity dots. The card body is white (CardService does not allow custom backgrounds) - we accept the platform default rather than attempting image-based hacks to fake a sand-coloured background.
 
-Three states (see Section 3.2 for the table).
+**All copy uses plain ASCII hyphen `-`.** No em-dashes or en-dashes anywhere in user-facing text.
 
-### 8.4 — Mobile
-CardService renders the same widget hierarchy on iOS / Android Gmail apps automatically. The SVG illustration scales. Findings stack one-per-row. No custom mobile code.
+The canonical visual reference is `addon/design-refs/preview-final-v2.png`.
 
-### 8.5 — Optional Day-3 experiment
-Animated GIF wave (calm → swell → crash loop). Ship if all three Gmail clients render it cleanly; fall back to static SVG otherwise. Zero-risk because fallback exists.
+### 8.3 - Hero illustrations (revised 2026-05-13)
+
+Three static PNGs at `backend/illustration/assets/`: `safe.png`, `suspicious.png`, `malicious.png`. Each is a 1535x767 (2:1) coastal scene with a sand-cream frame, sized so that at a 300px desktop card width the hero renders at 300x150, and at a 380px mobile card width at 380x190.
+
+The composition is fixed across all three states - lifeguard hut and palm tree on the left, lighthouse on the right. What changes between states is the lifeguard's posture, the weather, and the sea: relaxed in his beach chair with his dog under a blue sky (SAFE), standing with surfboard and binoculars scanning a rising swell at sunset (SUSPICIOUS), thrown by a crashing wave with surfboard separated under a storm-coral sky (MALICIOUS). The "character arc" reads as "you have a lifeguard, here's where he is right now."
+
+The original §3.2 plan was for the backend to *generate* SVG illustrations dynamically per (label, score). During the Task 25 design pass we replaced that with serving Lotan's three approved PNGs from disk. The public URL contract `/illustration/{label}` is preserved (the `?score=N` query param is still accepted but ignored). The retired SVG generator at `backend/illustration/wave.py` is rewritten to serve the static PNGs (see plan Task 25 Step 2).
+
+### 8.4 - Mobile
+CardService renders the same widget hierarchy on iOS / Android Gmail apps automatically. The PNG illustration scales. Findings stack one-per-row. No custom mobile code.
+
+### 8.5 - Optional Day-3 experiment (retired)
+The original spec proposed an animated GIF wave hero as a stretch. With Lotan's three approved illustrations now serving as the canonical hero PNGs, this experiment is retired - the static illustrations carry the visual weight on their own and animation would compete rather than add. Removed from active stretches in §12.
 
 ---
 

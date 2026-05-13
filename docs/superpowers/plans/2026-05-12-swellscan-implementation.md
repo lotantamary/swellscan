@@ -17,25 +17,31 @@
 
 | Phase | Tasks | Commits |
 |---|---|---|
-| Phase 0 — Foundations | 1–5 | `fec9e6c`, `84bd9ab`, `64d6d88`, `6a0e00d`, `0f37c9c` |
-| Phase 1 — Auth | 6 | `dbf3151` |
-| Phase 2 — Detectors + clients | 7–13 | `99adbec`, `f33a867`, `973f657`, `a798bbc`, `6911f42`, `8f464fc`, `e0c69cd` |
-| Phase 3 — LLM + pipeline + endpoint | 14–17 | `88439b3`, `3a2c78b`, `137921c`, `9b3354c` |
-| Phase 4 — Deployment | 18–21 | `5f50dcc`, `28e35a0`, (Cloud Run deploy + demo Gmail — runtime actions, no commits) |
+| Phase 0 - Foundations | 1-5 | `fec9e6c`, `84bd9ab`, `64d6d88`, `6a0e00d`, `0f37c9c` |
+| Phase 1 - Auth | 6 | `dbf3151` |
+| Phase 2 - Detectors + clients | 7-13 | `99adbec`, `f33a867`, `973f657`, `a798bbc`, `6911f42`, `8f464fc`, `e0c69cd` |
+| Phase 3 - LLM + pipeline + endpoint | 14-17 | `88439b3`, `3a2c78b`, `137921c`, `9b3354c` |
+| Phase 4 - Deployment | 18-21 | `5f50dcc`, `28e35a0`, (Cloud Run deploy + demo Gmail - runtime actions, no commits) |
+| Phase 5 (in progress) - Add-on Tasks 22-24 done | 22, 23, 24 | `c71f2a4`, `df44c67`, `9654029` |
 
 ### Known plan-vs-implementation drift (bugs caught during execution)
 
 | Task | Planned bug | Symptom | Fix |
 |---|---|---|---|
 | 8 (headers) | `make_email` defaulted `message_id_header` to empty, so the detector always emitted `MISSING_MESSAGE_ID` (LOW); planned test asserted "all evidence on happy path is INFO" | Test 1 failed against planned implementation | Added `message_id_header` default to the fixture |
-| 9 (sender) | `DISPLAY_NAME_DOMAIN_MISMATCH` check used `not any(brand in d for d in legit_domains + [from_domain])` — always False because the brand is always a substring of its own legit domain | Test 2 failed; detector could never emit this signal | Replaced with `from_domain not in legit_domains` |
+| 9 (sender) | `DISPLAY_NAME_DOMAIN_MISMATCH` check used `not any(brand in d for d in legit_domains + [from_domain])` - always False because the brand is always a substring of its own legit domain | Test 2 failed; detector could never emit this signal | Replaced with `from_domain not in legit_domains` |
 | 19 (Dockerfile) | `requirements.txt` was missing `requests`, which `google-auth` needs at runtime. Hidden locally because `pip-audit` (dev dep) pulled `requests` in transitively | Container `ImportError` at startup; would have failed Cloud Build | Added explicit `requests==2.34.0` to `requirements.txt` |
+| 24 (client.gs) | `parseHeaders` regex `^Name:\s*(.+)$` captured only the first physical line; RFC 5322 allows long headers to be folded across continuation lines starting with whitespace. `Authentication-Results` (SPF/DKIM/DMARC verdicts) is one of the most-folded headers in real Gmail traffic | Backend headers detector would emit empty evidence on most real emails | Unfold continuation lines (`\n[ \t]+` -> space) before applying the regex |
+| 24 (client.gs) | Backend's `OIDC_AUDIENCE` is set to the Cloud Run URL, but `ScriptApp.getIdentityToken()` returns a JWT whose `aud` is the Apps Script project's own OAuth client ID. Without a backend env-var update, every `/score` call would 401 at first install | Caught at trace time before code; Task 28 Step 4.5 added to capture the install-time fix procedure | Update `OIDC_AUDIENCE` env var to the script's client ID when the Add-on is installed (Task 28) |
+| 25 (render.gs - DESIGN REDESIGN, 2026-05-13) | Original planned `render.gs` code block had a small-text verdict line, no severity sorting of findings, basic single-color palette, "Re-scan" button only, em-dashes throughout, and a two-state "Scanning / Verdict" flow (Task 26). One full day of iterative design with Lotan rewrote the visual + structural plan. Final spec captured inline in Task 25 and 26 above. Canonical visual: `addon/design-refs/preview-final-v2.png`. Decisions: white body / default Roboto / palette-driven accents / sort-by-severity top 5 findings / "Findings: N signals detected" wording / packed single-line meta / bold-palette-colored opener with no trailing dot followed by italic body / fixed-footer per-state buttons wired to lifeguard-voice stub handlers / auto-scan single-state flow (Option A) / static PNG serving replaces SVG generator | Plan-doc planned code would have shipped a much weaker card; visual was not Lotan-approved at plan-write time | Replaced Task 25 + Task 26 spec entirely on 2026-05-13. Buttons-wiring deferred to Task 36.5 stretch. Em-dash sweep across user-facing copy completed |
 
-### What's next — Phase 5 (Add-on)
+### What's next - Phase 5 (Add-on)
 
-Task 22 (`appsscript.json` manifest) → Task 23 (`setup.gs`) → Task 24 (`client.gs` — the OIDC HTTP wrapper, needs the live backend URL `https://swellscan-backend-102679409749.us-central1.run.app`) → Task 25 (`render.gs` — invoke `frontend-design:frontend-design` skill before writing the card builder) → Task 26 (`Code.gs` trigger + state routing) → Task 27 (`baseline.gs` — `UserProperties` with `LockService`) → Task 28 (install + smoke test).
+**Now executing Task 25** (the locked spec, written by Lotan and Claude during the 2026-05-13 design pass): `render.gs` verdict card builder + backend swap to static PNG serving on `/illustration/{label}` + new `/dot/{severity}` endpoint. After 25: Task 26 (`Code.gs` auto-scan trigger + stub handlers) -> Task 27 (`baseline.gs` UserProperties with LockService) -> Task 28 (install + smoke test, including OIDC audience verification Step 4.5).
 
-The deploy-state memory (`project_deploy_state.md`) has every concrete value Phase 5 needs: live URL, allowlisted user, OIDC audience, secret names. **Phase 5 will not require any changes to the backend.**
+**Phase 5 now DOES require backend work** (against the original plan's claim): Task 25 swaps the `/illustration/{label}` implementation from the SVG generator built in Task 18 to static PNG file serving, and adds a new `/dot/{severity}` endpoint for severity-dot icons. Cloud Run redeploy required.
+
+The deploy-state memory (`project_deploy_state.md`) has every concrete value Phase 5 needs: live URL, allowlisted user, OIDC audience, secret names.
 
 ---
 
@@ -2592,170 +2598,320 @@ git commit -m "feat(addon): HTTP client with OIDC + payload builder from current
 
 ---
 
-### Task 25: render.gs — verdict card builder
+### Task 25: render.gs - verdict card builder + /illustration backend swap
 
 **Files:**
 - Create: `addon/render.gs`
+- Modify: `backend/illustration/wave.py` (replace SVG generator with static PNG serving)
+- Modify: any `tests/unit/test_wave.py` to match new behavior
+- Use: existing `backend/illustration/assets/{safe,suspicious,malicious}.png` (added during 2026-05-13 design pass)
+- Add: `/dot/{severity}` endpoint for severity-dot icons in DecoratedText rows
 
-- [ ] **Step 0: Invoke `frontend-design:frontend-design` skill** to refresh anti-AI-slop design heuristics. CardService heavily constrains styling, but widget choice, label copy, information hierarchy, and the scoring-vs-findings split are all design decisions where the skill's principles apply.
+**Design pass complete (2026-05-13).** The visual was iterated through six mockup screenshots with Lotan. The locked canonical visual is `addon/design-refs/preview-final-v2.png`. Every code block below reflects decisions already made; do NOT re-open the visual design loop.
 
-  ⚠️ **READ THIS BEFORE WRITING ANY CODE FOR THIS TASK.** Per the user's directive in `.claude/HANDOVER.md` (section "DESIGN IS NOT WHERE I WANT IT"): the user is NOT satisfied with the current visual design and wants it actively improved during Phase 5. Treat the `render.gs` code block below as ONE possible direction, not a target to reproduce.
+**Locked visual spec:**
 
-  Required flow:
-  1. Set aside the design-spec UI section and the planned code below.
-  2. **Wait for the user to provide visual references** (screenshots of UIs they find compelling — Gmail add-ons, security dashboards, etc.). If references aren't already in the chat by the time you reach this step, **ASK FOR THEM** before proposing anything.
-  3. After seeing references, propose 2–3 directions that explicitly incorporate elements from them, with rationale tied to rubric items (creativity, product thinking, security awareness).
-  4. Wait for the user to pick one. THEN write code.
-  5. Use `chrome-devtools-mcp:chrome-devtools` to render the actual card in Gmail and iterate visually — react to the rendered thing, not the code.
+| Element | Spec |
+|---|---|
+| Card body | White (CardService default; no customization attempted) |
+| Font | Default Roboto, default sizes, no letter-spacing tricks |
+| Hero image | `<Image>` widget pointing at `/illustration/{label}` (one of `safe.png`, `suspicious.png`, `malicious.png` - the 2:1 cropped PNGs Lotan provided) |
+| Verdict line | `<b><font color="#XXX">LABEL</font></b>  -  <b>N / 100</b>` via TextParagraph HTML. Color = palette per state |
+| Meta line | `<font color="#5f6368">XXX conf · N detector(s) · LLM consulted</font>` (or `LLM not needed` if `llm_invoked === false`). Single TextParagraph; wording kept short to avoid wrap |
+| Subject / sender | Two TextParagraphs in one section: subject bold + truncate to ~80 chars, sender in `#5f6368` |
+| Summary | One TextParagraph: bold palette-colored opener (sentence 1, trailing punctuation stripped) + `<br>` + italic body. NO blank line between opener and body |
+| Findings header | `<b>FINDINGS: <font color="#XXX">N signal(s) detected</font></b>` (palette color on the count) |
+| Findings list | Sorted DESC by severity, then DESC by confidence. Top 5 only. Each row is a `DecoratedText` with `setIconUrl()` pointing at `/dot/{severity}` (small palette-colored PNG icon) |
+| Action button | Fixed footer via `card.setFixedFooter()`. Per state: sage `#6e9c87` "Mark as expected" / amber `#d49a3f` "See all evidence" / coral `#b8442b` "Report & delete". `onClickAction` wired to handler in Code.gs (Task 26); handlers are stubs that return lifeguard-voice notification toasts. Real actions are Task 36.5 stretch |
+| All copy | Plain ASCII hyphen `-` only. No em-dash or en-dash anywhere |
 
-  Note: the user may install additional design-focused skills/plugins mid-session (e.g., Figma MCP, image-analysis tools). Watch for new entries in your available-skills list. You may also proactively suggest installing one if a specific tool would materially help.
+Palette colors (used consistently across verdict label, summary opener, findings count, action button, severity dots):
 
-  In-scope for redesign: information hierarchy, layout, copy, typography, color, the visual "character arc" across SAFE/SUSPICIOUS/MALICIOUS, even the wave metaphor itself if a better one exists.
+| State | Color | Severity tier this color also represents |
+|---|---|---|
+| SAFE | `#6e9c87` (sage) | LOW dots |
+| SUSPICIOUS | `#d49a3f` (amber) | MEDIUM dots |
+| MALICIOUS | `#b8442b` (coral) | HIGH and CRITICAL dots |
+| UNKNOWN (fallback) | `#808080` (grey) | n/a |
 
-  Also in-scope (deferred from Task 22 audit, 2026-05-13): the OAuth consent screen's `logoUrl` in `addon/appsscript.json` currently points at Google's generic script icon (`https://ssl.gstatic.com/docs/script/images/logo/script-64.png`). The consent screen is the very first surface a user (and an interviewer testing install) sees — a generic icon there silently undercuts the rest of the brand work. As part of this task's design pass, decide whether to ship a real Swellscan logo (likely a small new public endpoint on the backend, e.g. `GET /logo.png` returning a square PNG/SVG, mirroring the existing public `/illustration/{label}` pattern) or to consciously accept the placeholder and document why. If shipping a real logo, update `addon/appsscript.json` in the same task.
-
-  Locked (do NOT propose changes to): the `Verdict` JSON contract, the live `/illustration/{label}` URL contract, the `/score` endpoint, signal taxonomy, scoring math.
-
-- [ ] **Step 1: Create `addon/render.gs`**
+- [ ] **Step 1: Create `addon/render.gs`** with `buildVerdictCard(verdict)` plus the helpers below. Verdict shape received from backend already provides `label`, `score`, `confidence`, `evidence`, `summary`. The Add-on layer additionally attaches `subject`, `sender`, `llm_invoked`, `detectors_fired` from the payload context before calling this function (see Task 26).
 
 ```javascript
-/**
- * Build the verdict card from a Verdict JSON payload.
- */
+// Illustrative shape. Real code is written by tracing the spec table above.
+const PALETTE = {
+  'SAFE':       { color: '#6e9c87', btnText: 'Mark as expected', btnHandler: 'onMarkAsExpectedClicked' },
+  'SUSPICIOUS': { color: '#d49a3f', btnText: 'See all evidence', btnHandler: 'onSeeAllEvidenceClicked' },
+  'MALICIOUS':  { color: '#b8442b', btnText: 'Report & delete',  btnHandler: 'onReportAndDeleteClicked' },
+  'UNKNOWN':    { color: '#808080', btnText: 'Re-scan',           btnHandler: 'onRescanClicked' },
+};
+const SEVERITY_RANK = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1, 'info': 0 };
+
 function buildVerdictCard(verdict) {
+  const p = PALETTE[verdict.label] || PALETTE.UNKNOWN;
+  const findings = sortAndTrimFindings(verdict.evidence || []);
   const card = CardService.newCardBuilder();
-  const palette = paletteForLabel(verdict.label);
 
-  // Hero image
-  const heroSection = CardService.newCardSection();
-  const illustrationUrl = getBackendUrl() + '/illustration/' + verdict.label + '?score=' + verdict.score;
-  heroSection.addWidget(CardService.newImage().setImageUrl(illustrationUrl).setAltText('Swellscan: ' + verdict.label));
-  card.addSection(heroSection);
+  // Hero
+  card.addSection(CardService.newCardSection().addWidget(
+    CardService.newImage()
+      .setImageUrl(getBackendUrl() + '/illustration/' + verdict.label)
+      .setAltText('Swellscan: ' + verdict.label)));
 
-  // Score & verdict
-  const scoreSection = CardService.newCardSection();
-  scoreSection.addWidget(CardService.newDecoratedText()
-    .setText(verdict.label)
-    .setTopLabel('Swellscan verdict')
-    .setBottomLabel(verdict.score + ' / 100  ·  confidence ' + verdict.confidence));
-  card.addSection(scoreSection);
+  // Verdict line + meta line
+  const detWord = verdict.detectors_fired === 1 ? 'detector' : 'detectors';
+  const llmText = verdict.llm_invoked ? 'LLM consulted' : 'LLM not needed';
+  card.addSection(CardService.newCardSection()
+    .addWidget(CardService.newTextParagraph().setText(
+      '<b><font color="' + p.color + '">' + verdict.label + '</font></b>  -  <b>' +
+      verdict.score + ' / 100</b>'))
+    .addWidget(CardService.newTextParagraph().setText(
+      '<font color="#5f6368">' + (verdict.confidence || 'UNKNOWN').toUpperCase() +
+      ' conf &middot; ' + verdict.detectors_fired + ' ' + detWord +
+      ' &middot; ' + llmText + '</font>')));
 
-  // Summary
-  const summarySection = CardService.newCardSection();
-  summarySection.addWidget(CardService.newTextParagraph().setText(verdict.summary || 'Verdict computed.'));
-  card.addSection(summarySection);
+  // Subject + sender
+  card.addSection(CardService.newCardSection()
+    .addWidget(CardService.newTextParagraph().setText(
+      '<b>' + escapeHtml(truncate(verdict.subject || '', 80)) + '</b>'))
+    .addWidget(CardService.newTextParagraph().setText(
+      '<font color="#5f6368">' + escapeHtml(verdict.sender || '') + '</font>')));
 
-  // Findings
-  const findings = (verdict.evidence || []).filter(e => e.severity !== 'info').slice(0, 6);
-  if (findings.length > 0) {
-    const findingsSection = CardService.newCardSection().setHeader('Findings');
-    findings.forEach(e => {
-      const mitre = (e.mitre_techniques || []).join(', ');
-      findingsSection.addWidget(CardService.newDecoratedText()
-        .setText(e.signal)
-        .setTopLabel(e.severity.toUpperCase() + (mitre ? ' · ' + mitre : ''))
-        .setBottomLabel(e.explanation.substring(0, 200))
-        .setWrapText(true));
-    });
-    card.addSection(findingsSection);
+  // Summary (bold palette-colored opener + <br> + italic body)
+  if (verdict.summary) {
+    const parts = splitOpener(verdict.summary);
+    const html = '<b><font color="' + p.color + '">' + escapeHtml(parts.opener) +
+                 '</font></b><br><i>' + escapeHtml(parts.body) + '</i>';
+    card.addSection(CardService.newCardSection().addWidget(
+      CardService.newTextParagraph().setText(html)));
   }
 
-  // Footer with action
-  const footer = CardService.newFixedFooter().setPrimaryButton(
-    CardService.newTextButton().setText('Re-scan')
-      .setOnClickAction(CardService.newAction().setFunctionName('onScanClicked'))
-  );
-  card.setFixedFooter(footer);
+  // Findings (top 5, sorted)
+  if (findings.length > 0) {
+    const section = CardService.newCardSection();
+    const sigWord = findings.length === 1 ? 'signal' : 'signals';
+    section.addWidget(CardService.newTextParagraph().setText(
+      '<b>FINDINGS: <font color="' + p.color + '">' + findings.length +
+      ' ' + sigWord + ' detected</font></b>'));
+    findings.forEach(function (e) {
+      const mitre = (e.mitre_techniques || []).join(', ');
+      section.addWidget(CardService.newDecoratedText()
+        .setText(e.signal)
+        .setTopLabel(e.severity.toUpperCase() + (mitre ? ' · ' + mitre : ''))
+        .setBottomLabel(truncate(e.explanation || '', 200))
+        .setWrapText(true)
+        .setIconUrl(getBackendUrl() + '/dot/' + e.severity));
+    });
+    card.addSection(section);
+  }
+
+  // Fixed footer button (stub-wired - real action is Task 36.5 stretch)
+  card.setFixedFooter(CardService.newFixedFooter().setPrimaryButton(
+    CardService.newTextButton()
+      .setText(p.btnText)
+      .setBackgroundColor(p.color)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+      .setOnClickAction(CardService.newAction().setFunctionName(p.btnHandler))));
 
   return card.build();
 }
 
-function paletteForLabel(label) {
-  return {
-    'SAFE':       { accent: '#6BAF7D' },
-    'SUSPICIOUS': { accent: '#F0A04B' },
-    'MALICIOUS':  { accent: '#E54F4F' },
-    'UNKNOWN':    { accent: '#808080' },
-  }[label] || { accent: '#808080' };
+function sortAndTrimFindings(evidence) {
+  return evidence
+    .filter(function (e) { return e.severity !== 'info'; })
+    .sort(function (a, b) {
+      const sevDiff = (SEVERITY_RANK[b.severity] || 0) - (SEVERITY_RANK[a.severity] || 0);
+      if (sevDiff !== 0) return sevDiff;
+      return (b.confidence || 0) - (a.confidence || 0);
+    })
+    .slice(0, 5);
+}
+
+// Split summary into {opener, body} on first sentence boundary. Strip trailing punctuation from opener.
+function splitOpener(text) {
+  const m = String(text).match(/^([^.!?]+)[.!?]\s*(.*)$/);
+  if (!m) return { opener: text, body: '' };
+  return { opener: m[1].trim(), body: m[2].trim() };
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function truncate(s, n) {
+  s = String(s);
+  return s.length > n ? s.substring(0, n - 1) + '...' : s;
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Swap backend `/illustration/{label}` from SVG generator to static PNG serving.** This retires Task 18's SVG implementation; the public URL contract is preserved. In `backend/illustration/wave.py`:
+  - Replace the existing SVG-generation function with one that reads `safe.png`, `suspicious.png`, or `malicious.png` from `backend/illustration/assets/` based on the `{label}` path parameter.
+  - Return `200 OK` with `Content-Type: image/png` and `Cache-Control: public, max-age=3600`. Unknown labels return 404.
+  - The `?score=N` query parameter becomes effectively ignored (still accepted for URL compatibility, but does not change output). The score is now displayed in the card body, not baked into the illustration.
 
-```bash
-git add addon/render.gs
-git commit -m "feat(addon): verdict card renderer with hero image + findings section"
-```
+- [ ] **Step 3: Add `GET /dot/{severity}` endpoint** for the small severity-dot icons used in DecoratedText findings rows.
+  - At startup (or as committed PNGs in `backend/illustration/assets/dots/`), generate three 24x24 PNGs: `high.png` (coral `#b8442b`), `medium.png` (amber `#d49a3f`), `low.png` (sage `#6e9c87`). Each is a centered filled circle on a transparent background.
+  - Serve with `Content-Type: image/png` and the same 1-hour cache. `critical` aliases to `high`.
+
+- [ ] **Step 4: Update `tests/unit/test_wave.py`** (or whatever the existing wave tests are named) to test the new file-serving behavior: 200 + image/png for each label, 404 for unknown labels, 1-hour cache header present.
+
+- [ ] **Step 5: Redeploy backend.**
+  ```bash
+  cd swellscan && gcloud run deploy swellscan-backend --source . --region us-central1
+  ```
+  Existing secrets and env vars persist - no need to re-specify.
+
+- [ ] **Step 6: Smoke-test endpoints.**
+  ```bash
+  curl -I https://swellscan-backend-102679409749.us-central1.run.app/illustration/safe
+  curl -I https://swellscan-backend-102679409749.us-central1.run.app/illustration/suspicious
+  curl -I https://swellscan-backend-102679409749.us-central1.run.app/illustration/malicious
+  curl -I https://swellscan-backend-102679409749.us-central1.run.app/dot/high
+  curl -I https://swellscan-backend-102679409749.us-central1.run.app/dot/medium
+  curl -I https://swellscan-backend-102679409749.us-central1.run.app/dot/low
+  ```
+  Each expect `200` + `Content-Type: image/png` + `Cache-Control: public, max-age=3600`.
+
+- [ ] **Step 7: Commit and push** as two logical commits:
+  ```bash
+  git add addon/render.gs
+  git commit -m "feat(addon): verdict card per final design spec (palette-driven, stub buttons)"
+
+  git add backend/illustration/ tests/
+  git commit -m "feat(backend): swap /illustration to static PNG serving + add /dot endpoint"
+
+  git push
+  ```
 
 ---
 
-### Task 26: Code.gs — trigger + state routing
+### Task 26: Code.gs - auto-scan trigger + lifeguard-voice stub handlers
 
 **Files:**
 - Create: `addon/Code.gs`
+
+**Design decision locked 2026-05-13:** Option A - **auto-scan on icon click**, no intermediate "Ready to scan" card. The user opens an email, clicks the Swellscan sidebar icon, the scan runs inline (1-3 seconds), the verdict card returns. Reasons:
+1. Industry norm for security tools (Microsoft Defender, Proofpoint, etc. all auto-scan)
+2. Aligns with Upwind's "runtime / automatic" published philosophy
+3. The user already consented by installing the Add-on and clicking the icon - a second button click adds friction without adding consent
+4. The 1-3 second wait is shorter than the user's expectation of "opening a sidebar tool," not "clicking a button" (which implies instant response)
+
+**Three card action buttons are wired with stub handlers** that return lifeguard-voice notification toasts. Real action wiring lives in Task 36.5 stretch. The stub-handler approach means the buttons are visually present and clickable during the demo, with a coherent "coming soon" message, and the production-style wiring is in place so filling in handler bodies later is purely additive.
+
+**Stub toast texts (locked):**
+
+| Button | Toast |
+|---|---|
+| SAFE - "Mark as expected" | `The lifeguard's logbook isn't open yet. Coming in a future swell.` |
+| SUSPICIOUS - "See all evidence" | `The full report's still drying on the clipboard. Coming in a future swell.` |
+| MALICIOUS - "Report & delete" | `Cleanup crew's off-shift. We'll haul this one out in a future swell.` |
+
+**Error handling:** if the scan fails (backend down, network error, 401), the handler returns an error card via `buildErrorCard(err)` rather than a notification toast - the user needs to see the failure clearly when no verdict comes back, not a small dismissable strip.
 
 - [ ] **Step 1: Create `addon/Code.gs`**
 
 ```javascript
 /**
- * Gmail Add-on entry point — fires when the user opens an email and clicks Swellscan.
+ * Gmail Add-on entry point. Fires when the user opens an email and clicks
+ * the Swellscan icon. Auto-scans the open message and returns the verdict
+ * card. The 1-3 second wait is covered by Gmail's default sidebar loading
+ * indicator - we do not control that animation.
  */
 function onGmailMessageOpen(e) {
-  return buildScanningCard(e.gmail.messageId, e.gmail.accessToken);
-}
-
-/**
- * Loading state — shown immediately so the user sees feedback.
- * The button on this card triggers the actual scan.
- */
-function buildScanningCard(messageId, accessToken) {
-  const card = CardService.newCardBuilder();
-  card.setHeader(CardService.newCardHeader()
-    .setTitle('Swellscan')
-    .setSubtitle('Ready to analyze this message'));
-  const section = CardService.newCardSection();
-  section.addWidget(CardService.newImage()
-    .setImageUrl(getBackendUrl() + '/illustration/UNKNOWN?score=0')
-    .setAltText('Swellscan'));
-  section.addWidget(CardService.newTextParagraph().setText(
-    'Click Scan to analyze authentication, links, attachments, and sender patterns.'));
-  const scanAction = CardService.newAction()
-    .setFunctionName('onScanClicked')
-    .setParameters({ messageId: messageId, accessToken: accessToken });
-  section.addWidget(CardService.newTextButton()
-    .setText('Scan this message')
-    .setOnClickAction(scanAction)
-    .setBackgroundColor('#E54F4F'));
-  card.addSection(section);
-  return [card.build()];
-}
-
-/**
- * Performs the actual scan when the user clicks the button.
- */
-function onScanClicked(e) {
-  const messageId = e.parameters.messageId;
-  const accessToken = e.parameters.accessToken;
+  const messageId = e.gmail.messageId;
+  const accessToken = e.gmail.accessToken;
   try {
     const payload = buildEmailPayload(messageId, accessToken);
     const verdict = callBackend(payload);
+    // Attach payload-side context onto the verdict for render.gs to display
+    verdict.subject = payload.subject;
+    verdict.sender = formatSender(payload.from);
+    // Backend should already return these; default sensibly if it doesn't yet
+    verdict.detectors_fired = verdict.detectors_fired != null
+      ? verdict.detectors_fired
+      : (verdict.detectors_run || []).length;
+    verdict.llm_invoked = verdict.llm_invoked != null
+      ? verdict.llm_invoked
+      : (verdict.detectors_run || []).indexOf('llm') !== -1;
+    // Persist sender history (Task 27's baseline.gs handles message_id idempotency)
     updateSenderHistoryAfterScan(payload, verdict);
-    return CardService.newActionResponseBuilder()
-      .setNavigation(CardService.newNavigation().updateCard(buildVerdictCard(verdict)))
-      .build();
+    return [buildVerdictCard(verdict)];
   } catch (err) {
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Scan failed: ' + err.message.substring(0, 100)))
-      .build();
+    return [buildErrorCard(err)];
   }
+}
+
+function formatSender(from) {
+  if (from && from.display_name) {
+    return from.display_name + ' <' + from.address + '>';
+  }
+  return (from && from.address) || '';
+}
+
+function buildErrorCard(err) {
+  const msg = (err && err.message) ? err.message.substring(0, 240) : 'Unknown error';
+  const card = CardService.newCardBuilder();
+  card.setHeader(CardService.newCardHeader()
+    .setTitle('Scan failed')
+    .setSubtitle('Swellscan'));
+  card.addSection(CardService.newCardSection().addWidget(
+    CardService.newTextParagraph().setText(
+      '<font color="#b8442b"><b>Swellscan could not scan this message.</b></font><br>' +
+      escapeHtml(msg))));
+  return card.build();
+}
+
+/**
+ * Stub handler: SAFE card's "Mark as expected" button.
+ * Real action (mark sender as trusted in baseline) is Task 36.5 stretch.
+ */
+function onMarkAsExpectedClicked(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText(
+      "The lifeguard's logbook isn't open yet. Coming in a future swell."))
+    .build();
+}
+
+/**
+ * Stub handler: SUSPICIOUS card's "See all evidence" button.
+ * Real action (render second card with full evidence list) is Task 36.5 stretch.
+ */
+function onSeeAllEvidenceClicked(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText(
+      "The full report's still drying on the clipboard. Coming in a future swell."))
+    .build();
+}
+
+/**
+ * Stub handler: MALICIOUS card's "Report & delete" button.
+ * Real action (GmailApp moveToTrash + toast) is Task 36.5 stretch.
+ */
+function onReportAndDeleteClicked(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText(
+      "Cleanup crew's off-shift. We'll haul this one out in a future swell."))
+    .build();
+}
+
+/**
+ * Fallback handler for the UNKNOWN-state button. Not currently exercised on
+ * any happy path (UNKNOWN only renders if the backend returns an unrecognized
+ * label) but kept for parity so render.gs never references an undefined fn.
+ */
+function onRescanClicked(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText(
+      'Re-open the email to re-scan.'))
+    .build();
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Commit and push.**
 
 ```bash
 git add addon/Code.gs
-git commit -m "feat(addon): trigger function + scanning state → verdict card flow"
+git commit -m "feat(addon): auto-scan trigger + lifeguard-voice stub button handlers"
+git push
 ```
 
 ---
