@@ -122,23 +122,38 @@ function buildVerdictCard(verdict) {
 
   // 6. Action button - stub-wired (real action lives in Task 36.5 stretch).
   //
-  // FixedFooter is the CardService-conventional spot but always renders the
-  // primary button right-aligned. We instead use a regular section with a
-  // ButtonSet so we can attempt center alignment. If the host Apps Script
-  // version does not support setHorizontalAlignment on ButtonSet, we fall
-  // back to the default (left-aligned in section) without crashing.
+  // Two-path rendering:
+  //   Preferred  - centered button in a regular section via ButtonSet's
+  //                setHorizontalAlignment.
+  //   Fallback   - if this Apps Script runtime does not expose that method
+  //                (or the CENTER enum value), render via setFixedFooter
+  //                so we get the conventional right-aligned anchored
+  //                primary button. CardService's default matches Material
+  //                Design's "primary action at the trailing edge" rule, so
+  //                the fallback is itself a defensible result rather than
+  //                a broken-looking left-aligned section button.
   const button = CardService.newTextButton()
     .setText(p.btnText)
     .setBackgroundColor(p.color)
     .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
     .setOnClickAction(CardService.newAction().setFunctionName(p.btnHandler));
-  const buttonSet = CardService.newButtonSet().addButton(button);
-  try {
-    buttonSet.setHorizontalAlignment(CardService.HorizontalAlignment.CENTER);
-  } catch (err) {
-    // Older CardService; accept the default alignment for this widget.
+
+  const probe = CardService.newButtonSet();
+  const canCenter =
+    typeof probe.setHorizontalAlignment === 'function' &&
+    CardService.HorizontalAlignment &&
+    CardService.HorizontalAlignment.CENTER !== undefined;
+
+  if (canCenter) {
+    const buttonSet = CardService.newButtonSet()
+      .addButton(button)
+      .setHorizontalAlignment(CardService.HorizontalAlignment.CENTER);
+    card.addSection(CardService.newCardSection().addWidget(buttonSet));
+  } else {
+    card.setFixedFooter(
+      CardService.newFixedFooter().setPrimaryButton(button)
+    );
   }
-  card.addSection(CardService.newCardSection().addWidget(buttonSet));
 
   return card.build();
 }
