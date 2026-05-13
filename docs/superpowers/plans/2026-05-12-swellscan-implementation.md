@@ -3354,6 +3354,31 @@ git commit -m "feat(scoring): add correlation engine (3 hand-curated signal-set 
 
 ---
 
+### Task 36.6: Stretch - rewrite the verdict summary body for readability *(post-submission, only if time)*
+
+**Origin (2026-05-13, Task 28 first live install).** When the verdict card rendered against the demo Gmail account, the summary body under the lifeguard opener read as three disjoint sentences stitched together: *"Body contains a long base64-like string - may be an encoded payload. SPF passed. DKIM signature valid."* That text is exactly the `explanation` field of the top-3 evidence items, concatenated by `Pipeline._summarize()` in `backend/pipeline.py`. It is correct but choppy. Lotan flagged at the live install: *"In general, I would just like it to be what's going on in simple words."* All decisions below are **discussable - revisit when we get here.**
+
+**Three real paths, pick one:**
+
+| Path | What changes | Effort | Trade-offs |
+|---|---|---|---|
+| **A. LLM writes the body sentence** | When the LLM detector runs (raw score >= 25), add a "write a one-sentence plain-language explanation of why this email is suspicious/malicious" instruction to the existing prompt. Use that LLM output as the body. For SAFE (LLM not invoked) use a templated body. | ~45-60 min backend (Anthropic prompt change + a Pydantic field on the LLM output + plumbing in pipeline). | Coherent prose for the labels that matter most. Adds one more thing the LLM has to get right. Adds tokens to the LLM call (~50 output tokens = $0.0001 per call - negligible). |
+| **B. Templated body per state** | Replace `_summarize` with a label-aware template: SAFE = "Authentication and sender check out. No suspicious content detected." SUSPICIOUS = "[N findings] - sender authentication is [pass/fail], links checked, body scanned." MALICIOUS = "[N HIGH findings] - this looks like a [phishing/credential-harvesting/BEC] attempt." | ~30 min backend (one new module with templates). | Always reliable, always reads the same way. Cannot adapt to surprising signal combinations. |
+| **C. Smarter concatenation** | Keep `_summarize`'s top-3 approach but pick the SINGLE most informative explanation (highest severity x confidence) instead of three. Capitalize first letter, add a period at the end. | ~10 min backend. | Smallest change, smallest gain. Still depends on whatever the detectors emit. |
+
+**Cut criterion:** v1 summary body is acceptable - the lifeguard opener does most of the work, and the explanation is technically correct. Improvement is purely UX polish for the demo / interview. Skip if any other Phase 6 item runs over.
+
+**My recommendation when we revisit:** Path A. The LLM is already invoked on SUSPICIOUS / MALICIOUS - those are exactly the cards where the body text matters most. Path B for SAFE only (templated, since LLM doesn't run there). Hybrid is the best of both at a slightly higher effort than either alone (~60 min total).
+
+- [ ] **Step 1: Discuss with Lotan first.** Confirm A / B / C / hybrid.
+- [ ] **Step 2: Implement** per choice. Touch points: `backend/pipeline.py::_summarize`, possibly `backend/clients/anthropic.py` (prompt + schema), possibly a new `backend/scoring/summary.py` module for templates.
+- [ ] **Step 3: Add unit tests** in `tests/unit/test_pipeline.py` covering each label's body text shape.
+- [ ] **Step 4: Redeploy backend** via `gcloud run deploy swellscan-backend --source . --region us-central1`.
+- [ ] **Step 5: Re-verify in Gmail** - read 5 demo emails' summaries out loud, confirm they sound natural.
+- [ ] **Step 6: Commit** as `feat(backend): readable verdict summary body`.
+
+---
+
 ### Task 37: PDF cover sheet
 
 - [ ] **Step 1: Create a short PDF (1-2 pages)** containing:
