@@ -100,28 +100,45 @@ function buildVerdictCard(verdict) {
     findings.forEach(function (e) {
       const mitre = (e.mitre_techniques || []).join(', ');
       const top = String(e.severity || 'unknown').toUpperCase() + (mitre ? ' · ' + mitre : '');
-      section.addWidget(
-        CardService.newDecoratedText()
-          .setText(String(e.signal || 'unknown_signal'))
-          .setTopLabel(top)
-          .setBottomLabel(truncate(e.explanation || '', 200))
-          .setWrapText(true)
-          .setIconUrl(getBackendUrl() + '/dot/' + (e.severity || 'low'))
+      const dotUrl = getBackendUrl() + '/dot/' + String(e.severity || 'low').toLowerCase();
+      const widget = CardService.newDecoratedText()
+        .setText(prettySignal(e.signal))
+        .setTopLabel(top)
+        .setBottomLabel(truncate(e.explanation || '', 200))
+        .setWrapText(true);
+      // Prefer the newer setStartIcon(IconImage) over the legacy setIconUrl -
+      // the IconImage path lets CardService crop our solid-fill dot PNGs to
+      // a circle and renders more reliably than a raw URL.
+      widget.setStartIcon(
+        CardService.newIconImage()
+          .setIconUrl(dotUrl)
+          .setImageType(CardService.ImageType.CIRCLE)
+          .setAltText(String(e.severity || 'severity'))
       );
+      section.addWidget(widget);
     });
     card.addSection(section);
   }
 
-  // 6. Fixed footer button (stub-wired - real action lives in Task 36.5 stretch).
-  card.setFixedFooter(
-    CardService.newFixedFooter().setPrimaryButton(
-      CardService.newTextButton()
-        .setText(p.btnText)
-        .setBackgroundColor(p.color)
-        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setOnClickAction(CardService.newAction().setFunctionName(p.btnHandler))
-    )
-  );
+  // 6. Action button - stub-wired (real action lives in Task 36.5 stretch).
+  //
+  // FixedFooter is the CardService-conventional spot but always renders the
+  // primary button right-aligned. We instead use a regular section with a
+  // ButtonSet so we can attempt center alignment. If the host Apps Script
+  // version does not support setHorizontalAlignment on ButtonSet, we fall
+  // back to the default (left-aligned in section) without crashing.
+  const button = CardService.newTextButton()
+    .setText(p.btnText)
+    .setBackgroundColor(p.color)
+    .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+    .setOnClickAction(CardService.newAction().setFunctionName(p.btnHandler));
+  const buttonSet = CardService.newButtonSet().addButton(button);
+  try {
+    buttonSet.setHorizontalAlignment(CardService.HorizontalAlignment.CENTER);
+  } catch (err) {
+    // Older CardService; accept the default alignment for this widget.
+  }
+  card.addSection(CardService.newCardSection().addWidget(buttonSet));
 
   return card.build();
 }
@@ -196,4 +213,16 @@ function escapeHtml(s) {
 function truncate(s, n) {
   s = String(s);
   return s.length > n ? s.substring(0, n - 1) + '...' : s;
+}
+
+/**
+ * Turn a backend signal name like `lookalike_domain` into a readable label
+ * `Lookalike domain` for the card. The raw enum value is engineer-facing;
+ * the card should be human-facing.
+ */
+function prettySignal(s) {
+  if (!s) return 'Unknown signal';
+  return String(s)
+    .replace(/_/g, ' ')
+    .replace(/^./, function (c) { return c.toUpperCase(); });
 }
