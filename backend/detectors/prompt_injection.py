@@ -32,6 +32,17 @@ TAG_ESCAPE_PATTERN = re.compile(
 ZERO_WIDTH_PATTERN = re.compile("[​‌‍⁠﻿]")
 BASE64_BLOB_PATTERN = re.compile(r"[A-Za-z0-9+/]{80,}={0,2}")
 
+# V2.S5: payload-fragmentation detection. Pattern: 5+ short (1-3 char) quoted
+# tokens close together (the splits), AND an assembly verb anywhere in body
+# (the reassembly hint). Both required to limit false positives - legitimate
+# enumeration like "choose 'a', 'b', or 'c'" has neither 5 tokens NOR an
+# assembly verb.
+_FRAG_QUOTED_TOKENS = re.compile(r"(?:['\"][\w./:@-]{1,3}['\"][\s,]*){5,}")
+_FRAG_ASSEMBLY_VERB = re.compile(
+    r"\b(?:joined|combined|concatenated|assemble|reassemble|reconstruct)\b",
+    flags=re.I,
+)
+
 
 class PromptInjectionDetector(Detector):
     name = "prompt_injection"
@@ -97,6 +108,23 @@ class PromptInjectionDetector(Detector):
                     severity=Severity.MEDIUM,
                     confidence=0.6,
                     explanation="Body contains a long base64-like string - may be an encoded payload.",
+                    mitre_techniques=["T1027"],
+                    details={},
+                    detector=self.name,
+                )
+            )
+
+        if _FRAG_QUOTED_TOKENS.search(body) and _FRAG_ASSEMBLY_VERB.search(body):
+            out.append(
+                Evidence(
+                    signal=Signal.PAYLOAD_FRAGMENTATION_ATTEMPT,
+                    severity=Severity.MEDIUM,
+                    confidence=0.75,
+                    explanation=(
+                        "Body contains short tokens followed by assembly "
+                        "instructions - pattern used to evade LLM safety "
+                        "filters by splitting payloads."
+                    ),
                     mitre_techniques=["T1027"],
                     details={},
                     detector=self.name,

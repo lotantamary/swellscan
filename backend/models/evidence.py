@@ -45,6 +45,7 @@ class Signal(StrEnum):
     TAG_ESCAPING_ATTEMPT = "tag_escaping_attempt"
     SUSPICIOUS_UNICODE_IN_BODY = "suspicious_unicode_in_body"
     ENCODED_PAYLOAD_IN_BODY = "encoded_payload_in_body"
+    PAYLOAD_FRAGMENTATION_ATTEMPT = "payload_fragmentation_attempt"
     # sender baseline
     FIRST_SEEN_SENDER = "first_seen_sender"
     SENDER_DOMAIN_DRIFT = "sender_domain_drift"
