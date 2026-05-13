@@ -99,28 +99,34 @@ function buildVerdictCard(verdict) {
     );
     findings.forEach(function (e) {
       const mitre = (e.mitre_techniques || []).join(', ');
-      const top = String(e.severity || 'unknown').toUpperCase() + (mitre ? ' · ' + mitre : '');
       const dotUrl = getBackendUrl() + '/dot/' + String(e.severity || 'low').toLowerCase();
+
+      // Main text holds the human-readable signal name + (optional) MITRE
+      // technique id inline. The severity is communicated by the dot
+      // color alone, so we deliberately do NOT repeat it as text in a
+      // top label - that was redundant in the first install.
+      const titleText = prettySignal(e.signal) + (mitre ? ' · ' + mitre : '');
+
       const widget = CardService.newDecoratedText()
-        .setText(prettySignal(e.signal))
-        .setTopLabel(top)
+        .setText(titleText)
         .setBottomLabel(truncate(e.explanation || '', 200))
         .setWrapText(true);
-      // Prefer the newer setStartIcon(IconImage) over the legacy setIconUrl -
-      // the IconImage path renders more reliably and lets CardService crop
-      // our solid-fill PNG to a circle on runtimes that support it.
+
+      // Severity dot via setStartIcon(IconImage). Apps Script has used
+      // different method names for the circle-crop control across
+      // versions: setImageType in older docs, setImageStyle in newer.
+      // Try both with the ImageStyle.CIRCLE enum. If neither works the
+      // dot renders as a colored square - still a clear severity
+      // indicator, just with sharper corners.
       const iconImage = CardService.newIconImage()
         .setIconUrl(dotUrl)
         .setAltText(String(e.severity || 'severity'));
-      try {
-        // CardService.ImageStyle.CIRCLE crops the icon to a circle. If
-        // this Apps Script version doesn't expose it, the icon renders as
-        // a colored square instead - still a visible dot, just sharper
-        // corners. Defensive try/catch so a missing enum can't crash the
-        // whole card render.
-        iconImage.setImageStyle(CardService.ImageStyle.CIRCLE);
-      } catch (err) {
-        // Square fallback; intentional no-op.
+      const cropAttempts = [
+        function () { iconImage.setImageType(CardService.ImageStyle.CIRCLE); },
+        function () { iconImage.setImageStyle(CardService.ImageStyle.CIRCLE); },
+      ];
+      for (let i = 0; i < cropAttempts.length; i++) {
+        try { cropAttempts[i](); break; } catch (err) { /* try next */ }
       }
       widget.setStartIcon(iconImage);
       section.addWidget(widget);
