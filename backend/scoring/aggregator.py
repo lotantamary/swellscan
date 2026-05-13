@@ -11,6 +11,16 @@ from backend.scoring.policy import (
     SEVERITY_WEIGHTS,
 )
 
+# Lifeguard-voice openers prepended to the verdict summary per label. The
+# Add-on's render.gs splits the summary on the first sentence boundary and
+# bolds/colors that opener; the technical body follows in italic.
+LIFEGUARD_OPENERS = {
+    VerdictLabel.SAFE: "All clear, you can paddle.",
+    VerdictLabel.SUSPICIOUS: "Something off about this set.",
+    VerdictLabel.MALICIOUS: "Out of the water on this one.",
+    VerdictLabel.UNKNOWN: "Status unclear right now.",
+}
+
 
 def compute_raw_score(evidence: list[Evidence]) -> int:
     raw = sum(SEVERITY_WEIGHTS[e.severity] * e.confidence for e in evidence)
@@ -56,12 +66,20 @@ def build_verdict(
     label = label_from_score(final)
     confidence = confidence_from_evidence(evidence)
     mitre = sorted({m for e in evidence for m in e.mitre_techniques})
+
+    # Prepend the lifeguard-voice opener. render.gs splits the summary on
+    # the first sentence boundary so the opener gets bolded + palette-
+    # colored and the technical body becomes italic underneath.
+    body = summary or "Verdict computed from evidence."
+    opener = LIFEGUARD_OPENERS.get(label, "")
+    full_summary = f"{opener} {body}" if opener else body
+
     return Verdict(
         request_id=str(uuid4()),
         score=final,
         label=label,
         confidence=confidence,
-        summary=summary or "Verdict computed from evidence.",
+        summary=full_summary,
         evidence=evidence,
         mitre_summary=mitre,
         computed_at=datetime.now(timezone.utc),
