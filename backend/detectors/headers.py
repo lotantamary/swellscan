@@ -26,6 +26,31 @@ FREEMAIL_DOMAINS = {
     "live.com",
 }
 
+# V2.S3b: Return-Path transactional-mailer allowlist. These domains legitimately
+# differ from the From: domain because the sender uses a third-party mail
+# service to handle bounces. Without this allowlist, the signal would
+# false-fire on every Sendgrid/Mailgun/SES-routed email.
+TRANSACTIONAL_MAILER_DOMAINS = {
+    "sendgrid.net",
+    "mailgun.org",
+    "amazonses.com",
+    "mandrillapp.com",
+    "sparkpostmail.com",
+    "sparkpostmail1.com",
+    "mtasv.net",
+    "rsgsv.net",
+    "mailchimp.com",
+    "constantcontact.com",
+    "salesforceiq.com",
+    "exacttarget.com",
+    "marketo.com",
+    "pardot.com",
+    "hubspotemail.net",
+    "intercom-mail.com",
+    "postmarkapp.com",
+    "customeriomail.com",
+}
+
 
 class HeadersDetector(Detector):
     name = "headers"
@@ -134,6 +159,57 @@ class HeadersDetector(Detector):
                         details={
                             "from_domain": from_domain,
                             "reply_domain": reply_domain,
+                        },
+                    )
+                )
+
+        # V2.S3b: Return-Path mismatch. Return-Path is set by the sending MTA
+        # so it's harder to forge than Reply-To. Mismatch is a stronger
+        # forgery signal but transactional setups commonly produce legitimate
+        # mismatches - the allowlist filters those out.
+        if email.headers.return_path:
+            rp_raw = (
+                email.headers.return_path.strip().lstrip("<").rstrip(">").strip()
+            )
+            rp_domain = (
+                rp_raw.split("@", 1)[-1].lower() if "@" in rp_raw else ""
+            )
+            from_domain = email.from_.address.split("@", 1)[-1].lower()
+            domains_differ = bool(rp_domain) and rp_domain != from_domain
+            is_subdomain = bool(rp_domain) and (
+                rp_domain.endswith("." + from_domain)
+                or from_domain.endswith("." + rp_domain)
+            )
+            is_transactional = rp_domain in TRANSACTIONAL_MAILER_DOMAINS
+            if domains_differ and not is_subdomain and not is_transactional:
+                if (
+                    rp_domain in FREEMAIL_DOMAINS
+                    and from_domain not in FREEMAIL_DOMAINS
+                ):
+                    severity, confidence = Severity.HIGH, 0.9
+                    explanation = (
+                        f"Return-Path points to a personal email account "
+                        f"({rp_domain}) while sender domain is {from_domain} "
+                        f"- bounce-routing this way is rare in legitimate "
+                        f"corporate email."
+                    )
+                else:
+                    severity, confidence = Severity.MEDIUM, 0.75
+                    explanation = (
+                        f"Return-Path domain ({rp_domain}) does not match "
+                        f"From domain ({from_domain}) and is not a known "
+                        f"transactional mailer."
+                    )
+                out.append(
+                    self._ev(
+                        Signal.RETURN_PATH_DOMAIN_MISMATCH,
+                        severity,
+                        confidence,
+                        explanation,
+                        mitre=["T1566"],
+                        details={
+                            "from_domain": from_domain,
+                            "return_path_domain": rp_domain,
                         },
                     )
                 )

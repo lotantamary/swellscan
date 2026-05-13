@@ -21,6 +21,7 @@ class Signal(StrEnum):
     DKIM_MISSING = "dkim_missing"
     DMARC_FAIL = "dmarc_fail"
     REPLY_TO_DOMAIN_MISMATCH = "reply_to_domain_mismatch"
+    RETURN_PATH_DOMAIN_MISMATCH = "return_path_domain_mismatch"
     MISSING_MESSAGE_ID = "missing_message_id"
     # sender
     DISPLAY_NAME_DOMAIN_MISMATCH = "display_name_domain_mismatch"
