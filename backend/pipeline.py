@@ -74,10 +74,27 @@ class Pipeline:
 
     @staticmethod
     def _summarize(evidence: list[Evidence]) -> str:
+        """V2.S8 body builder.
+
+        Preference order:
+          1. LLM-written body if any evidence has 'llm_summary_body' in details.
+          2. Templated body for the SAFE case (all evidence INFO/LOW).
+          3. Fallback to the top evidence's explanation (preserves V1 behavior
+             when the LLM didn't run but a risky signal still fired).
+        """
         if not evidence:
             return "No suspicious signals detected."
+
+        for ev in evidence:
+            body = ev.details.get("llm_summary_body")
+            if isinstance(body, str) and body.strip():
+                return body.strip()
+
+        if all(_SEVERITY_RANK[ev.severity] <= 1 for ev in evidence):
+            return "Authentication and sender check out, no suspicious content detected."
+
         top = sorted(
             evidence,
             key=lambda e: (-_SEVERITY_RANK[e.severity], -e.confidence),
-        )[:3]
-        return " ".join(e.explanation for e in top)
+        )[0]
+        return top.explanation

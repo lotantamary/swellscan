@@ -40,6 +40,14 @@ class LLMDetector(Detector):
             sig, sev = Signal.LLM_SUSPICIOUS_PATTERN, Severity.MEDIUM
         else:
             sig, sev = Signal.LLM_BENIGN_JUDGMENT, Severity.INFO
+        details = {
+            "matched_patterns": verdict.matched_patterns,
+            "should_warn_user": verdict.should_warn_user,
+        }
+        # V2.S8: pipeline._summarize reads llm_summary_body from evidence
+        # details to build the user-facing one-sentence verdict body.
+        if verdict.summary_body and verdict.summary_body.strip():
+            details["llm_summary_body"] = verdict.summary_body.strip()
         return [
             Evidence(
                 signal=sig,
@@ -51,10 +59,7 @@ class LLMDetector(Detector):
                     if sig != Signal.LLM_BENIGN_JUDGMENT
                     else []
                 ),
-                details={
-                    "matched_patterns": verdict.matched_patterns,
-                    "should_warn_user": verdict.should_warn_user,
-                },
+                details=details,
                 detector=self.name,
             )
         ]
