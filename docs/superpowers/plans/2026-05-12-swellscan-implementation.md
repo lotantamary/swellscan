@@ -3163,6 +3163,41 @@ git commit -m "feat(scoring): add correlation engine (3 hand-curated signal-set 
 
 ---
 
+### Task 36.5: Stretch - wire the three card action buttons *(post-submission, only if time)*
+
+**Origin (2026-05-13, Task 25 design pass).** During Phase 5 we decided to ship the three per-state action buttons as **wired stubs**: the buttons appear on every verdict card, each has its `onClickAction` hooked to a real handler function in `Code.gs`, but the handler bodies just return a `CardService.Notification` with a lifeguard-voice "coming in a future swell" toast and do not perform any real product action. This stretch fills in the handler bodies so the buttons do real work. All decisions below are **discussable - revisit when we get here.**
+
+**Scope: three buttons.** Each is independent; we can wire one, two, or all three.
+
+| Button | Frontend files | Backend files | Time | Breakage risk |
+|---|---|---|---|---|
+| SAFE - "Mark as expected" | `render.gs` (already has the button), `Code.gs` (replace stub handler body), `baseline.gs` (add `markSenderTrusted()` helper that writes `user_trusted=true` into the sender's UserProperties entry) | `backend/detectors/sender_baseline.py` - read the flag, suppress baseline evidence when set. Requires one Cloud Run redeploy. | ~45-60 min | LOW. Additive change. Flag absent = behavior matches today. |
+| SUSPICIOUS - "See all evidence" | `render.gs` (add `buildAllEvidenceCard()` that shows ALL evidence including info-level + a Back button), `Code.gs` (replace stub handler body - re-call `/score` and push the new card via CardService navigation) | None. Re-uses existing `/score` endpoint. No redeploy. | ~30-45 min | LOW. New code path, untouched existing flow. |
+| MALICIOUS - "Report & delete" | `render.gs` (already has the button), `Code.gs` (replace stub handler body - call `GmailApp.getMessageById(id).moveToTrash()`, return a confirmation toast) | None. No redeploy. | ~30-45 min | LOW-MEDIUM. Real action on a real message - sanity-check the messageId before the destructive op. |
+
+**Total: 3 to 4 frontend files, 1 backend file (only for the SAFE button), one Cloud Run redeploy. About 2 to 2.5 hours.**
+
+**What breaks: nothing.** Every change is additive - new function bodies replacing stub bodies, with the button/action wiring already in place from Task 25. Existing flows continue working untouched.
+
+**Open product questions to settle when we revisit:**
+1. Should "Mark as expected" be reversible (a follow-up "Untrust this sender" option somewhere)?
+2. For "Report & delete" - move to Spam or to Trash? Spam trains Gmail's own filter too, Trash just removes the message.
+3. For "See all evidence" - re-fetch from backend (clean, costs a round trip) or cache the verdict in `UserProperties` keyed by `message_id` (faster, adds state). Re-fetch is the default.
+
+**Cut criterion:** all three buttons stay as wired stubs if v1 ships clean and Lotan wants to move on. Wiring them is the canonical "what would you do with more time" answer at the interview.
+
+- [ ] **Step 1: Discuss with Lotan first.** Confirm scope (1, 2, or 3 buttons), confirm answers to the three open product questions above.
+
+- [ ] **Step 2: Implement chosen buttons.** Replace stub handler bodies in `Code.gs` with the real logic per the table.
+
+- [ ] **Step 3: Update backend if SAFE button is in scope.** Add the `user_trusted` flag read to `backend/detectors/sender_baseline.py`. Add a unit test in `tests/unit/test_sender_baseline.py`. Redeploy via `gcloud run deploy`.
+
+- [ ] **Step 4: Smoke-test each wired button** against the demo Gmail account. For "Report & delete" especially - verify the message actually moves and the card dismisses cleanly.
+
+- [ ] **Step 5: Commit per button** with `feat(addon): wire <button-name> action`.
+
+---
+
 ### Task 37: PDF cover sheet
 
 - [ ] **Step 1: Create a short PDF (1-2 pages)** containing:
