@@ -2864,6 +2864,21 @@ git commit -m "feat(addon): per-sender history with LockService + message_id ide
 
 - [ ] **Step 4: Deploy → Test deployments → Install** — confirm the test deployment is active.
 
+- [ ] **Step 4.5: Verify OIDC audience match (deferred from Task 24, 2026-05-13).** `ScriptApp.getIdentityToken()` returns a JWT whose `aud` claim is the Apps Script project's own OAuth client ID — *not* the backend URL. The backend currently verifies `aud == https://swellscan-backend-102679409749.us-central1.run.app` (set via the `OIDC_AUDIENCE` env var on Cloud Run). If those don't match, every `/score` call returns 401 and Step 5 will fail with "Backend returned 401" in the Apps Script execution log.
+
+  Procedure:
+  1. In the Apps Script editor → Project Settings (gear icon) → copy the OAuth Client ID (looks like `<project-number>-<hash>.apps.googleusercontent.com`).
+  2. Redeploy backend with the new audience:
+     ```bash
+     cd swellscan && gcloud run deploy swellscan-backend --source . --region us-central1 \
+       --update-env-vars="OIDC_AUDIENCE=<paste-client-id-here>"
+     ```
+     (Use `--update-env-vars` — secrets and other env vars from the prior revision persist.)
+  3. Sanity-check: `gcloud run services describe swellscan-backend --region us-central1 --format='value(spec.template.spec.containers[0].env)'` shows the new `OIDC_AUDIENCE`.
+  4. If Step 5 still 401s, decode the actual token in the failing call (paste it into [jwt.io](https://jwt.io)) and inspect the `aud` claim directly — that's the value the backend needs.
+
+  Update `project_deploy_state.md` memory with the new `OIDC_AUDIENCE` value once it works.
+
 - [ ] **Step 5: Open Gmail** signed in as the demo account. Open any email. Click the Swellscan icon in the right sidebar. Click "Scan this message".
 
 - [ ] **Step 6: Verify** — a verdict card appears with score, label, summary, and findings. If failure: check Apps Script Executions log + Cloud Run logs (`gcloud run services logs read swellscan-backend`).
