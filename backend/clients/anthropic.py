@@ -18,18 +18,61 @@ class LLMVerdict(BaseModel):
     should_warn_user: bool
 
 
-# Sequences in the body that look like a closing delimiter for our prompt
-# wrapper get zero-width chars inserted between '<' and '/' - visually identical
-# to a human but breaks the regex an attacker would use to escape the sandbox.
-_TAG_ESCAPE_RE = re.compile(
-    r"</(untrusted|system|instruction|prompt|evidence|email)",
+# V2.S2 defense-in-depth sanitization. Applied in order before the body
+# reaches Claude. The prompt-injection detector still runs against the
+# ORIGINAL body and emits signals like SUSPICIOUS_UNICODE_IN_BODY; this
+# function strips those same patterns from the LLM-visible content.
+
+# Closing-tag mimics. V1 inserted zero-width chars between '<' and '/'; V2
+# strips zero-width chars globally, which would undo that protection. New
+# strategy: remove closing-tag-mimic sequences entirely.
+_CLOSING_TAG_MIMIC = re.compile(
+    r"</(?:untrusted|system|instruction|prompt|evidence|email)[a-z0-9_]*>",
     flags=re.I,
 )
 
+# CSS-hidden HTML: strip element-and-contents when the style attribute hides it.
+# Pragmatic regex, not a full HTML parser. Catches display:none, font-size:0,
+# color:white, color:#FFFFFF (and other f-only hex variants).
+_HIDDEN_HTML = re.compile(
+    r"<(\w+)\s[^>]*style\s*=\s*[\"'][^\"']*"
+    r"(?:display\s*:\s*none|font-size\s*:\s*0|color\s*:\s*#?[fF][fF]{2,5}|color\s*:\s*white)"
+    r"[^\"']*[\"'][^>]*>[\s\S]*?</\1>",
+    flags=re.I,
+)
+
+# Markdown auto-fetched / referenced URLs - EchoLeak (CVE-2025-32711) class.
+_MARKDOWN_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+_MARKDOWN_REF_LINK = re.compile(r"\[[^\]]+\]\[[^\]]+\]")
+_MARKDOWN_REF_DEF = re.compile(r"^\s*\[[^\]]+\]:\s*\S+.*$", flags=re.M)
+
+# Unicode Tags block U+E0000 to U+E007F - invisible-payload encoding for LLMs
+# (Cisco research 2025; MITRE T1027.018 sub-technique).
+_UNICODE_TAGS = re.compile(r"[\U000E0000-\U000E007F]")
+
+# Zero-width and invisible chars. V1 only inserted these as part of the
+# closing-tag escape; V2 strips them globally.
+# U+200B zero-width space, U+200C zero-width non-joiner, U+200D zero-width
+# joiner, U+2060 word joiner, U+FEFF byte-order mark.
+_ZERO_WIDTH = re.compile("[​‌‍⁠﻿]")
+
 
 def _sanitize_body(body: str) -> str:
-    """Escape sequences that look like closing tags before insertion into the prompt."""
-    return _TAG_ESCAPE_RE.sub(r"<​​/\1", body)
+    """Apply V2 defense-in-depth sanitization before passing body to the LLM.
+
+    Order matters: hidden HTML must be stripped before zero-width chars in
+    case the attacker hid invisible chars inside a hidden element. The
+    closing-tag-mimic neutralization runs last so any tag-name remnants
+    inside removed regions don't survive.
+    """
+    body = _HIDDEN_HTML.sub("", body)
+    body = _MARKDOWN_IMAGE.sub("", body)
+    body = _MARKDOWN_REF_LINK.sub("", body)
+    body = _MARKDOWN_REF_DEF.sub("", body)
+    body = _UNICODE_TAGS.sub("", body)
+    body = _ZERO_WIDTH.sub("", body)
+    body = _CLOSING_TAG_MIMIC.sub("[removed]", body)
+    return body
 
 
 class AnthropicClient:
