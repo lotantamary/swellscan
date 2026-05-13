@@ -8,9 +8,9 @@
 | **Context** | Upwind Security Bootcamp home assignment |
 | **Submission deadline** | Fri 2026-05-15 EOD |
 | **Demo interview** | Scheduled by author after submission (~Mon 2026-05-18) |
-| **Status** | Backend implementation complete + deployed to Cloud Run (Tasks 1–21 of 39); Phase 5 (Apps Script Add-on) next |
+| **Status** | Phases 0-5 complete (Tasks 1-28 of 39). Backend deployed on Cloud Run (revision `00008-gpx`); Gmail Add-on installed on the demo account; verdict card renders end-to-end in real Gmail. Card visual locked at `addon/design-refs/preview-final-v2.png`. Phase 6 (polish + submission) next. |
 | **Live backend URL** | `https://swellscan-backend-102679409749.us-central1.run.app` |
-| **Last revised** | 2026-05-12 (status only — design decisions unchanged) |
+| **Last revised** | 2026-05-13 (status line + §8.2 / §8.3 / §8.5 rewritten for auto-scan flow + static-PNG hero serving + retired animated-GIF stretch; §12.2 gained the per-signal drill-down future-work entry). |
 
 ---
 

@@ -4,14 +4,15 @@
 >
 > **⚠️ READ-BEFORE-EXECUTE — the code blocks in this plan are a LOGIC SPEC, not source of truth.** This plan was written speculatively in one pass with no code execution. Several tasks contain code that has a logic bug, a stale field reference, or a missing dependency that only surfaced under `pytest` or `docker run`. The rule (captured in the `feedback_plan_code_is_spec_not_source.md` memory): trace each planned code block mentally against the planned test BEFORE writing anything; reconstruct the body deliberately; surface discovered bugs in the recap (they make great interview stories). See **Known plan-vs-implementation drift** below for the bugs found so far.
 
-## Progress (as of 2026-05-12)
+## Progress (as of 2026-05-13)
 
-**Phases 0–4 complete — Tasks 1–21 of 39 done. Backend is deployed live on Cloud Run.**
+**Phases 0-5 complete - Tasks 1-28 of 39 done. Backend deployed live AND Add-on installed on the demo Gmail account.**
 
-- **Live backend URL:** `https://swellscan-backend-102679409749.us-central1.run.app`
-- **Tests:** 40 passing (`pytest` from repo root)
+- **Live backend URL:** `https://swellscan-backend-102679409749.us-central1.run.app`  -  current Cloud Run revision: `swellscan-backend-00008-gpx`
+- **Tests:** 53 passing (`pytest` from repo root)
 - **GCP project:** `swellscan-prod` (number `102679409749`) owned by `swellscan.demo@gmail.com`
-- **What's next:** **Phase 5 — Apps Script Add-on (Tasks 22–28).** First non-backend phase. JavaScript (V8) in Google Workspace runtime.
+- **Card visual locked** at `addon/design-refs/preview-final-v2.png` after six mockup iterations + Lotan approval. Live card matches.
+- **What's next:** **Phase 6 - Polish + Submission (Tasks 29-39 plus inline stretches 31.5, 36.5, 36.6).** Demo data → cleanup + security → docs → submission. Submission deadline Fri 2026-05-15 EOD.
 
 ### Completed tasks (with commit SHAs)
 
@@ -22,7 +23,7 @@
 | Phase 2 - Detectors + clients | 7-13 | `99adbec`, `f33a867`, `973f657`, `a798bbc`, `6911f42`, `8f464fc`, `e0c69cd` |
 | Phase 3 - LLM + pipeline + endpoint | 14-17 | `88439b3`, `3a2c78b`, `137921c`, `9b3354c` |
 | Phase 4 - Deployment | 18-21 | `5f50dcc`, `28e35a0`, (Cloud Run deploy + demo Gmail - runtime actions, no commits) |
-| Phase 5 (in progress) - Add-on Tasks 22-24 done | 22, 23, 24 | `c71f2a4`, `df44c67`, `9654029` |
+| Phase 5 - Apps Script Add-on | 22-28 | `c71f2a4`, `df44c67`, `9654029`, `001e2b6`, `a8eb82c`, `59c6a10`, `9b93314`, plus 10+ Task 28 post-install design polish commits (`136c05b` script.locale scope add-back, `2e1eee1` lifeguard prefix + dot regen, `c6de9e6` IconImage/CIRCLE + prettySignal, `2793119` button fallback, `abe8ea2` enum fix, `bc39d90` MITRE inline, `02e764b` inline bullet, `c58908c` drop subject/sender, `395bcf2` body indent attempt, `7bccdba` full-title color, `e371659` logo endpoint, `5ed07c8` logo background removal) |
 
 ### Known plan-vs-implementation drift (bugs caught during execution)
 
@@ -34,14 +35,22 @@
 | 24 (client.gs) | `parseHeaders` regex `^Name:\s*(.+)$` captured only the first physical line; RFC 5322 allows long headers to be folded across continuation lines starting with whitespace. `Authentication-Results` (SPF/DKIM/DMARC verdicts) is one of the most-folded headers in real Gmail traffic | Backend headers detector would emit empty evidence on most real emails | Unfold continuation lines (`\n[ \t]+` -> space) before applying the regex |
 | 24 (client.gs) | Backend's `OIDC_AUDIENCE` is set to the Cloud Run URL, but `ScriptApp.getIdentityToken()` returns a JWT whose `aud` is the Apps Script project's own OAuth client ID. Without a backend env-var update, every `/score` call would 401 at first install | Caught at trace time before code; Task 28 Step 4.5 added to capture the install-time fix procedure | Update `OIDC_AUDIENCE` env var to the script's client ID when the Add-on is installed (Task 28) |
 | 25 (render.gs - DESIGN REDESIGN, 2026-05-13) | Original planned `render.gs` code block had a small-text verdict line, no severity sorting of findings, basic single-color palette, "Re-scan" button only, em-dashes throughout, and a two-state "Scanning / Verdict" flow (Task 26). One full day of iterative design with Lotan rewrote the visual + structural plan. Final spec captured inline in Task 25 and 26 above. Canonical visual: `addon/design-refs/preview-final-v2.png`. Decisions: white body / default Roboto / palette-driven accents / sort-by-severity top 5 findings / "Findings: N signals detected" wording / packed single-line meta / bold-palette-colored opener with no trailing dot followed by italic body / fixed-footer per-state buttons wired to lifeguard-voice stub handlers / auto-scan single-state flow (Option A) / static PNG serving replaces SVG generator | Plan-doc planned code would have shipped a much weaker card; visual was not Lotan-approved at plan-write time | Replaced Task 25 + Task 26 spec entirely on 2026-05-13. Buttons-wiring deferred to Task 36.5 stretch. Em-dash sweep across user-facing copy completed |
+| 22 (appsscript.json) - script.locale scope | Task 22 dropped the `script.locale` OAuth scope on a "minimum permissions" principle, claiming `useLocaleFromApp: true` did not require it. Task 28 live install proved that wrong: the Gmail Add-on framework calls `Session.getActiveUserLocale()` implicitly during card rendering, and Apps Script raised "The script does not have permission to perform that action. Required permissions: https://www.googleapis.com/auth/script.locale" | First click on the Swellscan icon in Gmail showed an error card instead of the verdict | Added the scope back to `addon/appsscript.json` (commit `136c05b`). Lotan re-pasted the manifest in Apps Script editor, re-ran `setup()`, approved the new consent dialog. |
+| 28 (render.gs - VISUAL POLISH chain, 2026-05-13) | First live install showed several visual gaps vs the canonical mockup that only surfaced under real CardService rendering: (a) the severity dot icon rendered as an oversized colored square because `setStartIcon(IconImage)` gives a fixed ~40px frame and the `ImageStyle.CIRCLE` enum wasn't reliable across Apps Script versions; (b) signal names rendered as raw snake_case (`encoded_payload_in_body`); (c) "MEDIUM" severity word duplicated as text alongside the colored dot; (d) summary started with the first evidence explanation instead of a lifeguard-voice opener; (e) the subject + sender row felt redundant since the email is already visible behind/above the Add-on sidebar; (f) when the title had a leading bullet, the body wrapped flush left so wrapped lines misaligned with the title text - CardService has no hanging-indent control | The first-install card was visually clearly different from `preview-final-v2.png` | Iterated through ~10 small commits live-testing each fix against Gmail: regenerated dots as solid-fill PNGs, switched to inline Unicode bullet then dropped the bullet entirely in favor of coloring the whole title in the severity palette color, added a `prettySignal()` helper, prepended `LIFEGUARD_OPENERS` to `verdict.summary` in the aggregator, dropped the subject+sender section + the `verdict.subject` / `verdict.sender` enrichment in `Code.gs`, added a try-catch ButtonSet center-alignment with FixedFooter right-aligned-anchored fallback, fixed the IconImage enum name (`ImageStyle` not `ImageType`), processed the Swellscan logo PNG to a transparent-background tight-cropped wave. Final live card now matches the canonical mockup. |
 
-### What's next - Phase 5 (Add-on)
+### What's next - Phase 6 (Polish + Submission)
 
-**Now executing Task 25** (the locked spec, written by Lotan and Claude during the 2026-05-13 design pass): `render.gs` verdict card builder + backend swap to static PNG serving on `/illustration/{label}` + new `/dot/{severity}` endpoint. After 25: Task 26 (`Code.gs` auto-scan trigger + stub handlers) -> Task 27 (`baseline.gs` UserProperties with LockService) -> Task 28 (install + smoke test, including OIDC audience verification Step 4.5).
+**Phase 5 is complete.** The Add-on is installed on the demo Gmail account and the verdict card renders end-to-end correctly. Phase 6 ships the product:
 
-**Phase 5 now DOES require backend work** (against the original plan's claim): Task 25 swaps the `/illustration/{label}` implementation from the SVG generator built in Task 18 to static PNG file serving, and adds a new `/dot/{severity}` endpoint for severity-dot icons. Cloud Run redeploy required.
+Demo data: Task 29 (pre-seed `UserProperties` so the per-sender-baseline detector demos cleanly) → Task 30 (craft 5 demo emails covering SAFE / SUSPICIOUS / MALICIOUS) → Task 31 (manual end-to-end test against all 5).
+Cleanup + security: Task 31.5 (`simplify` + `code-review:code-review`) → Task 32 (`pip-audit` + `security-review`).
+Documentation: Task 34 (full README) → Task 35 (refresh CLAUDE.md once more) → Task 37 (PDF cover sheet).
+Submission: Task 38 (email + repo URL + PDF to recruiters) → Task 39 (`superpowers:finishing-a-development-branch` handoff).
+Stretches (only if time): Task 33 (threat-research scan), Task 36 (correlation engine), Task 36.5 (wire the three button handlers), Task 36.6 (rewrite the verdict summary body).
 
-The deploy-state memory (`project_deploy_state.md`) has every concrete value Phase 5 needs: live URL, allowlisted user, OIDC audience, secret names.
+Recommended sequence: 29 → 30 → 31 first (real testing while bugs are still fixable), then 31.5 + 32, then 34 + 35, stretches in any gaps, 37 + 38 last.
+
+The deploy-state memory (`project_deploy_state.md`) has every concrete value Phase 6 needs: live URL, allowlisted user, OIDC audience, current Cloud Run revision, secret names.
 
 ---
 

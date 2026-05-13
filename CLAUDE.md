@@ -4,18 +4,21 @@ Swellscan is a Gmail Add-on that analyzes the currently-open email and produces 
 
 The design deliberately mirrors Upwind's own published architecture (RSAC 2026 malicious-prompt detector): three threat-class coverage areas (phishing-links, BEC, attachments) plus three deliberate stand-out moments — self-defending LLM, wave-themed verdict card with a character arc, and per-sender baselining. Submission deadline: **Fri 2026-05-15 EOD**.
 
-## Current State (updated 2026-05-12)
+## Current State (updated 2026-05-13)
 
-**Phases 0–4 complete (Tasks 1–21 of 39).** The entire Python backend is built, tested, containerized, and **deployed live on Cloud Run**.
+**Phases 0-5 complete (Tasks 1-28 of 39).** Backend AND the Gmail Add-on are built, deployed, and **installed live on the demo Gmail account**. The verdict card renders correctly in Gmail's right sidebar end-to-end.
 
-- **Live URL:** [`https://swellscan-backend-102679409749.us-central1.run.app`](https://swellscan-backend-102679409749.us-central1.run.app/health) — `/health` returns `{"status":"ok"}`, `/score` is OIDC-protected (401 without a valid Google ID token), `/illustration/{label}?score=N` serves SVG verdict art with 1-hour cache headers.
-- **Tests:** 40 passing (33 unit + 2 integration + 5 model/policy). `pytest` from repo root runs all.
-- **Three signature features built:**
-  1. **Self-defending LLM** — Task 10 prompt-injection detector + Task 14 hardened Anthropic client (random per-request wrapper tag, zero-width sanitization of closing-tag patterns, system-prompt trust-boundary instructions)
-  2. **Layered detection** — Task 15 pipeline + Task 4 thresholds (cheap deterministic detectors run in parallel; LLM invoked only when raw score ≥ 25)
-  3. **Per-sender baseline** — Task 17 sender-history drift detection (FIRST_SEEN / DOMAIN_DRIFT / SEND_TIME_ANOMALY / IP_GEOGRAPHY_CHANGE signals)
-- **GCP project:** `swellscan-prod` (project number `102679409749`), owned by `swellscan.demo@gmail.com`, billing on free trial. Three secrets in Secret Manager (`anthropic-api-key`, `virustotal-api-key`, `safebrowsing-api-key`).
-- **What's next:** **Phase 5 — Apps Script Add-on** (Tasks 22–28). First non-backend phase. JavaScript (V8) running in Google Workspace. Card UI, OIDC client, per-user baseline storage.
+- **Live URL:** [`https://swellscan-backend-102679409749.us-central1.run.app`](https://swellscan-backend-102679409749.us-central1.run.app/health) - `/health` returns `{"status":"ok"}`, `/score` is OIDC-protected (401 without a valid Google ID token), `/illustration/{label}` serves the static hero PNG (SAFE/SUSPICIOUS/MALICIOUS), `/dot/{severity}` serves the severity-dot icon, `/logo.png` serves the Swellscan brand logo. All static endpoints carry a 1-hour cache.
+- **Live revision:** `swellscan-backend-00008-gpx`.
+- **Tests:** **53 passing** (40 prior + 13 illustration/logo endpoint tests). `pytest` from repo root runs all.
+- **Three signature features built and verified end-to-end:**
+  1. **Self-defending LLM** - Task 10 prompt-injection detector + Task 14 hardened Anthropic client (random per-request wrapper tag, zero-width sanitization of closing-tag patterns, system-prompt trust-boundary instructions)
+  2. **Layered detection** - Task 15 pipeline + Task 4 thresholds (cheap deterministic detectors run in parallel; LLM invoked only when raw score >= 25)
+  3. **Per-sender baseline** - Task 17 backend detector + Task 27 Add-on `UserProperties` writer with `LockService` + `message_id` ring-buffer idempotency
+- **GCP project:** `swellscan-prod` (project number `102679409749`), owned by `swellscan.demo@gmail.com`, billing on free trial. Three secrets in Secret Manager.
+- **OIDC_AUDIENCE** (updated 2026-05-13 during Task 28 Step 4.5): `812475821064-s838lvgcgmc1nj4lbjqivpa48usi4t8v.apps.googleusercontent.com` - the Apps Script project's OAuth client ID, NOT the Cloud Run URL. `ScriptApp.getIdentityToken()` returns a token with `aud` set to the script's OAuth client; the original Cloud Run URL value would 401 on every request.
+- **Card visual is LOCKED:** canonical mockup at `addon/design-refs/preview-final-v2.png`. Live card in Gmail matches.
+- **What's next:** **Phase 6 - Polish + Submission** (Tasks 29-39 plus inline stretches 31.5, 36.5, 36.6). Demo data → cleanup + security → docs → submission. Submission deadline Fri 2026-05-15 EOD.
 
 For the full deployment-state reference (URLs, IAM, env vars, the bugs we found at deploy time, cleanup commands at end-of-project), see the `project_deploy_state.md` memory file.
 
@@ -40,15 +43,28 @@ For the full deployment-state reference (URLs, IAM, env vars, the bugs we found 
 | 15 | `3a2c78b` | Pipeline orchestrator |
 | 16 | `137921c` | `POST /score` endpoint |
 | 17 | `9b3354c` | Sender-baseline detector |
-| 18 | `5f50dcc` | SVG wave illustration generator |
+| 18 | `5f50dcc` | SVG wave illustration generator (later retired during Task 25) |
 | 19 | `28e35a0` | Dockerfile (caught missing `requests` dep) |
-| 20–21 | (no code) | Cloud Run deployment + demo Gmail account |
+| 20-21 | (runtime ops) | Cloud Run deployment + demo Gmail account |
+| 22 | `c71f2a4` | `appsscript.json` manifest with minimum-needed Gmail scopes |
+| 23 | `df44c67` | `setup.gs` one-time config (BACKEND_URL + OIDC_AUDIENCE → ScriptProperties) |
+| 24 | `9654029` | `client.gs` HTTP wrapper + RFC 5322 header unfold + Gmail payload builder |
+| 25 | `001e2b6`, `a8eb82c` | `render.gs` verdict card builder + backend SVG-to-PNG swap on `/illustration` + new `/dot/{severity}` endpoint |
+| 26 | `59c6a10` | `Code.gs` auto-scan trigger + lifeguard-voice stub button handlers |
+| 27 | `9b93314` | `baseline.gs` UserProperties with LockService + ring-buffer idempotency + bounded growth on typical_* arrays |
+| 28 | (live install + iterations) | Apps Script project created on demo Gmail, OIDC audience captured + backend redeployed (Step 4.5), 8+ post-install design polish commits (`136c05b` script.locale scope, `2e1eee1` lifeguard prefix + dot regen, `c6de9e6` IconImage/CIRCLE + prettySignal, `2793119` button fallback, `abe8ea2` enum fix, `bc39d90` MITRE inline, `02e764b` inline bullet, `c58908c` drop subject/sender, `395bcf2` body indent, `7bccdba` full-title color, `e371659` logo endpoint, `5ed07c8` logo background removal) |
 
 **Plan-vs-implementation drift caught (interview material):**
 
-- Task 8 headers — planned test assumed `make_email` had a non-empty default Message-ID; fixed by adding `message_id_header` default to the fixture.
-- Task 9 sender — planned `DISPLAY_NAME_DOMAIN_MISMATCH` check used `not any(brand in d for legit_domains + [from_domain])`, which is always false because the brand is always a substring of its own legit domain. Fixed to `from_domain not in legit_domains`.
-- Task 19 Docker — production container's missing `requests` dep (locally hidden by `pip-audit` dev dep pulling it in transitively). Added explicit `requests==2.34.0` to `requirements.txt`.
+- **Task 8** headers - planned test assumed `make_email` had a non-empty default Message-ID; fixed by adding `message_id_header` default to the fixture.
+- **Task 9** sender - planned `DISPLAY_NAME_DOMAIN_MISMATCH` check used `not any(brand in d for legit_domains + [from_domain])`, always false because the brand is always a substring of its own legit domain. Fixed to `from_domain not in legit_domains`.
+- **Task 19** Docker - production container's missing `requests` dep (locally hidden by `pip-audit` dev dep pulling it in transitively). Added explicit `requests==2.34.0` to `requirements.txt`.
+- **Task 24** client.gs - planned `parseHeaders` regex captured only the first physical line; RFC 5322 allows long headers to be folded across continuation lines. Without the fix, the backend would emit empty SPF/DKIM/DMARC evidence on most real Gmail messages.
+- **Task 24** OIDC audience - planned auth assumed `OIDC_AUDIENCE = Cloud Run URL`; `ScriptApp.getIdentityToken()` actually returns a JWT whose `aud` is the script's OAuth client ID. Caught at trace time, fixed during Task 28 Step 4.5 by capturing the actual `aud` from a one-time helper and redeploying the backend with the matching env var.
+- **Task 25** card design - the planned `render.gs` code block was a small-text verdict line with no severity sorting and a generic "Re-scan" button. Replaced wholesale via a full design pass (six mockup iterations + Lotan approval at each); canonical visual locked at `addon/design-refs/preview-final-v2.png`.
+- **Task 25** SVG generator retired - Task 18's `wave.py` SVG generator was replaced with static PNG file serving for the three hero illustrations Lotan provided. Public URL contract preserved.
+- **Task 22** scopes - the `script.locale` OAuth scope was dropped on a "minimum permissions" principle. Task 28 live install proved the Gmail Add-on framework requires it at runtime even when we never call `Session.getActiveUserLocale()` directly. Scope added back.
+- **Task 28** card iterations - first install surfaced a chain of visual fixes that converged via iterative real-Gmail testing: severity dot rendering (IconImage circle-crop unreliable across runtimes; switched to coloring the title text), signal name pretty-printing, button alignment fallback (centered with FixedFooter fallback), summary opener readability, subject+sender row removal as redundant, body text alignment under the title.
 
 ## Tech Stack & Environment
 
