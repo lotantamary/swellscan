@@ -102,31 +102,28 @@ function buildVerdictCard(verdict) {
     );
     findings.forEach(function (e) {
       const mitre = (e.mitre_techniques || []).join(', ');
-      const dotColor = severityColor(e.severity);
+      const titleColor = severityColor(e.severity);
 
-      // Inline colored bullet at the start of the title. Unicode BLACK
-      // CIRCLE (&#9679;) renders at the text's font size - small, always
-      // round, palette-colored via <font color>. We deliberately avoid
-      // setStartIcon(IconImage) here because CardService gives that slot
-      // a fixed ~40px frame we cannot shrink, and the circle-crop enum
-      // proved unreliable across Apps Script versions. The inline
-      // bullet is the lightest-weight approach that always works.
+      // Color the entire title text in the severity palette color. Body
+      // stays in CardService's default muted color so the title is the
+      // visual anchor and the body is supporting detail.
+      //
+      // History: earlier iterations tried a setStartIcon(IconImage) with
+      // a colored dot, then an inline Unicode bullet with an NBSP body
+      // indent. Both broke on multi-line wrap because CardService gives
+      // us no hanging-indent control - wrapped lines always realign at
+      // the widget's left edge. Coloring the whole title is the only
+      // approach that gives a clean wrap at every body length.
       const titleHtml =
-        '<font color="' + dotColor + '">&#9679;</font>  ' +
+        '<font color="' + titleColor + '">' +
         escapeHtml(prettySignal(e.signal)) +
-        (mitre ? ' &middot; ' + escapeHtml(mitre) : '');
-
-      // Pad the bottom-label body with leading non-breaking spaces so
-      // it visually aligns under the title text rather than under the
-      // bullet. setBottomLabel takes plain text (no HTML), so we use
-      // the actual Unicode NBSP codepoint ( ). Four NBSPs is a
-      // close visual match to the bullet + 2-space prefix width.
-      const bodyText = '    ' + truncate(e.explanation || '', 200);
+        (mitre ? ' &middot; ' + escapeHtml(mitre) : '') +
+        '</font>';
 
       section.addWidget(
         CardService.newDecoratedText()
           .setText(titleHtml)
-          .setBottomLabel(bodyText)
+          .setBottomLabel(truncate(e.explanation || '', 200))
           .setWrapText(true)
       );
     });
