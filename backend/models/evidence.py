@@ -51,6 +51,8 @@ class Signal(StrEnum):
     SENDER_DOMAIN_DRIFT = "sender_domain_drift"
     SENDER_SEND_TIME_ANOMALY = "sender_send_time_anomaly"
     SENDER_IP_GEOGRAPHY_CHANGE = "sender_ip_geography_change"
+    # bec language
+    PAYMENT_INSTRUCTION_URGENCY = "payment_instruction_urgency"
     # llm
     LLM_HIGH_RISK_PATTERN = "llm_high_risk_pattern"
     LLM_SUSPICIOUS_PATTERN = "llm_suspicious_pattern"

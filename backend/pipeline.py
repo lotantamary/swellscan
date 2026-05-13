@@ -5,6 +5,7 @@ import structlog
 
 from backend.detectors.attachments import AttachmentsDetector
 from backend.detectors.base import Detector
+from backend.detectors.bec_language import BecLanguageDetector
 from backend.detectors.headers import HeadersDetector
 from backend.detectors.llm import LLMDetector
 from backend.detectors.prompt_injection import PromptInjectionDetector
@@ -41,6 +42,7 @@ class Pipeline:
             AttachmentsDetector(),
             PromptInjectionDetector(),
             SenderBaselineDetector(),
+            BecLanguageDetector(),  # V2.S6
         ]
         self._llm = llm_detector or LLMDetector()
 
