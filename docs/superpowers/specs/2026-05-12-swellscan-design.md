@@ -581,6 +581,7 @@ On Day 3-4, populate the demo account's `UserProperties` with synthetic sender h
 - **Multi-tenant SaaS architecture** (auth + billing + isolation)
 - **Google Workspace Marketplace listing** (one-click public install)
 - **"Why is this SAFE?" positive-signal explanation card**
+- **Per-signal drill-down explanation cards (added 2026-05-13).** Every finding row in the verdict card becomes clickable. Clicking opens a second card that explains, in plain language, what this signal actually means and what the user should do about it. CardService supports this natively via `DecoratedText.setOnClickAction(...)` and `Navigation.pushCard(...)`. Per-signal copy would live alongside the `Signal` enum on the backend, served via a new `/signal/{name}` endpoint returning a small JSON document with `description`, `recommended_action`, and an optional MITRE link. Educational + action-oriented: the Add-on stops being just an alert and becomes a teacher. Estimated effort ~2-3 hours (per-signal copy + drill-down card builder + click handler + backend endpoint + tests).
 - **Per-user statistics dashboard**
 
 Each is a real answer to *"what would you do with more time?"*
