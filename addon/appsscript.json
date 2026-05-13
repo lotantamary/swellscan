@@ -13,7 +13,7 @@
   "addOns": {
     "common": {
       "name": "Swellscan",
-      "logoUrl": "https://ssl.gstatic.com/docs/script/images/logo/script-64.png",
+      "logoUrl": "https://swellscan-backend-102679409749.us-central1.run.app/logo.png",
       "useLocaleFromApp": true
     },
     "gmail": {

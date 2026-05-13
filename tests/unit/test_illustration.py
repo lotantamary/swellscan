@@ -100,3 +100,16 @@ def test_dot_severity_case_insensitive():
     case; the endpoint should accept any casing."""
     response = client.get("/dot/HIGH")
     assert response.status_code == 200
+
+
+# /logo.png -------------------------------------------------------------
+
+def test_logo_returns_png():
+    """The Swellscan brand logo served at /logo.png. Referenced by the
+    Add-on manifest's logoUrl field, so it must be publicly accessible
+    (no auth) and PNG-typed."""
+    response = client.get("/logo.png")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.headers["cache-control"] == "public, max-age=3600"
+    assert len(response.content) > 0

@@ -12,6 +12,7 @@ from backend.models.verdict import VerdictLabel
 
 ASSETS_DIR = Path(__file__).parent / "assets"
 DOTS_DIR = ASSETS_DIR / "dots"
+LOGO_FILE = ASSETS_DIR / "logo.png"
 
 # Only the three real verdict states have illustrations. UNKNOWN would be
 # a backend bug rather than a normal verdict; we let it 404 rather than
@@ -42,3 +43,9 @@ def dot_path(severity: str) -> Path | None:
     """Return the on-disk PNG path for the given severity name, or None if
     the severity is unrecognised."""
     return DOT_FILES.get(severity.lower())
+
+
+def logo_path() -> Path | None:
+    """Return the on-disk PNG path for the Swellscan brand logo, or None
+    if the file isn't present yet."""
+    return LOGO_FILE if LOGO_FILE.exists() else None

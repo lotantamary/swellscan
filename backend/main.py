@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 import structlog
 
 from backend.api.score import router as score_router
-from backend.illustration.wave import dot_path, illustration_path
+from backend.illustration.wave import dot_path, illustration_path, logo_path
 from backend.models.verdict import VerdictLabel
 
 structlog.configure(processors=[structlog.processors.JSONRenderer()])
@@ -41,4 +41,16 @@ def dot(severity: str):
     path = dot_path(severity)
     if path is None or not path.exists():
         raise HTTPException(status_code=404, detail="Unknown severity")
+    return FileResponse(path, media_type="image/png", headers=_CACHE_HEADERS)
+
+
+@app.get("/logo.png", response_class=FileResponse)
+def logo():
+    """Serve the Swellscan brand logo. Referenced by the Add-on's
+    `appsscript.json` `logoUrl` field; shown on the OAuth consent screen
+    when a user first installs the Add-on and in Gmail's sidebar icon.
+    """
+    path = logo_path()
+    if path is None:
+        raise HTTPException(status_code=404, detail="Logo not found")
     return FileResponse(path, media_type="image/png", headers=_CACHE_HEADERS)
