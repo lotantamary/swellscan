@@ -4,6 +4,52 @@ Swellscan is a Gmail Add-on that analyzes the currently-open email and produces 
 
 The design deliberately mirrors Upwind's own published architecture (RSAC 2026 malicious-prompt detector): three threat-class coverage areas (phishing-links, BEC, attachments) plus three deliberate stand-out moments — self-defending LLM, wave-themed verdict card with a character arc, and per-sender baselining. Submission deadline: **Fri 2026-05-15 EOD**.
 
+## Current State (updated 2026-05-12)
+
+**Phases 0–4 complete (Tasks 1–21 of 39).** The entire Python backend is built, tested, containerized, and **deployed live on Cloud Run**.
+
+- **Live URL:** [`https://swellscan-backend-102679409749.us-central1.run.app`](https://swellscan-backend-102679409749.us-central1.run.app/health) — `/health` returns `{"status":"ok"}`, `/score` is OIDC-protected (401 without a valid Google ID token), `/illustration/{label}?score=N` serves SVG verdict art with 1-hour cache headers.
+- **Tests:** 40 passing (33 unit + 2 integration + 5 model/policy). `pytest` from repo root runs all.
+- **Three signature features built:**
+  1. **Self-defending LLM** — Task 10 prompt-injection detector + Task 14 hardened Anthropic client (random per-request wrapper tag, zero-width sanitization of closing-tag patterns, system-prompt trust-boundary instructions)
+  2. **Layered detection** — Task 15 pipeline + Task 4 thresholds (cheap deterministic detectors run in parallel; LLM invoked only when raw score ≥ 25)
+  3. **Per-sender baseline** — Task 17 sender-history drift detection (FIRST_SEEN / DOMAIN_DRIFT / SEND_TIME_ANOMALY / IP_GEOGRAPHY_CHANGE signals)
+- **GCP project:** `swellscan-prod` (project number `102679409749`), owned by `swellscan.demo@gmail.com`, billing on free trial. Three secrets in Secret Manager (`anthropic-api-key`, `virustotal-api-key`, `safebrowsing-api-key`).
+- **What's next:** **Phase 5 — Apps Script Add-on** (Tasks 22–28). First non-backend phase. JavaScript (V8) running in Google Workspace. Card UI, OIDC client, per-user baseline storage.
+
+For the full deployment-state reference (URLs, IAM, env vars, the bugs we found at deploy time, cleanup commands at end-of-project), see the `project_deploy_state.md` memory file.
+
+**Tasks completed with commit SHAs:**
+
+| Task | Commit | What |
+|---|---|---|
+| 1 | `fec9e6c` | FastAPI skeleton + `/health` |
+| 2 | `84bd9ab` | `Email` Pydantic model + fixtures |
+| 3 | `64d6d88` | `Evidence` + `Verdict` models |
+| 4 | `6a0e00d` | Scoring policy (weights, thresholds) |
+| 5 | `0f37c9c` | Aggregator (pure function) |
+| 6 | `dbf3151` | OIDC token verification |
+| 7 | `99adbec` | `Detector` ABC with `safe_run` |
+| 8 | `f33a867` | Headers detector (SPF/DKIM/DMARC) |
+| 9 | `973f657` | Sender detector (lookalike + impersonation) |
+| 10 | `a798bbc` | Prompt-injection detector |
+| 11 | `6911f42` | External clients (VT, SB, urlscan) |
+| 12 | `8f464fc` | URLs detector |
+| 13 | `e0c69cd` | Attachments detector |
+| 14 | `88439b3` | Anthropic client + LLM detector |
+| 15 | `3a2c78b` | Pipeline orchestrator |
+| 16 | `137921c` | `POST /score` endpoint |
+| 17 | `9b3354c` | Sender-baseline detector |
+| 18 | `5f50dcc` | SVG wave illustration generator |
+| 19 | `28e35a0` | Dockerfile (caught missing `requests` dep) |
+| 20–21 | (no code) | Cloud Run deployment + demo Gmail account |
+
+**Plan-vs-implementation drift caught (interview material):**
+
+- Task 8 headers — planned test assumed `make_email` had a non-empty default Message-ID; fixed by adding `message_id_header` default to the fixture.
+- Task 9 sender — planned `DISPLAY_NAME_DOMAIN_MISMATCH` check used `not any(brand in d for legit_domains + [from_domain])`, which is always false because the brand is always a substring of its own legit domain. Fixed to `from_domain not in legit_domains`.
+- Task 19 Docker — production container's missing `requests` dep (locally hidden by `pip-audit` dev dep pulling it in transitively). Added explicit `requests==2.34.0` to `requirements.txt`.
+
 ## Tech Stack & Environment
 
 **Backend (`backend/`)** — Python 3.12, FastAPI, async I/O via `httpx`. Pydantic 2 for all request/response models and LLM output validation. `structlog` for structured JSON logging. `google-auth` for OIDC token verification. Anthropic SDK for Claude Sonnet 4.6.
@@ -61,12 +107,20 @@ pytest --cov=backend            # with coverage (~80% target on detectors + scor
 pytest tests/unit/test_headers_detector.py  # one file
 pip-audit                       # known-CVE check before submission
 
-# Deploy backend to Cloud Run (one command, builds from source)
+# Deploy backend to Cloud Run (one command, builds from source).
+# The secrets and env vars from the last revision persist, so a code-only
+# redeploy can omit --set-secrets and --set-env-vars.
 gcloud run deploy swellscan-backend \
   --source . --region us-central1 \
   --set-secrets="ANTHROPIC_API_KEY=anthropic-api-key:latest,VIRUSTOTAL_API_KEY=virustotal-api-key:latest,SAFEBROWSING_API_KEY=safebrowsing-api-key:latest" \
-  --set-env-vars="ALLOWED_USERS=swellscan.demo.lotan@gmail.com,OIDC_AUDIENCE=<cloud-run-url>" \
+  --set-env-vars="ALLOWED_USERS=swellscan.demo@gmail.com,OIDC_AUDIENCE=https://swellscan-backend-102679409749.us-central1.run.app" \
   --allow-unauthenticated  # app-layer OIDC enforcement, not IAM
+
+# One-time IAM grant needed before the first deploy (so Cloud Run's default
+# compute SA can read Secret Manager). Already applied to swellscan-prod.
+gcloud projects add-iam-policy-binding swellscan-prod \
+  --member="serviceAccount:102679409749-compute@developer.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
 
 # Add-on — deploy via Apps Script editor
 # 1. Open script.new, paste contents of addon/*.gs
@@ -106,3 +160,5 @@ Update only the affected section(s). Do not rewrite the whole file. Apply the sa
 
 - `.claude/docs/architectural_patterns.md` — Deep dives on the evidence-based pattern, OIDC auth flow, prompt-injection defense layers, scoring policy
 - `docs/superpowers/specs/2026-05-12-swellscan-design.md` — The full design document. Single source of truth for every architectural and product decision. Read this first.
+- `docs/superpowers/plans/2026-05-12-swellscan-implementation.md` — The numbered implementation plan. **Treat code blocks inside it as logic-spec / pseudo-code, not source-of-truth** — see the `feedback_plan_code_is_spec_not_source.md` memory for why. The plan was written speculatively in one pass; it has at least three known bugs that surfaced during implementation (see "Plan-vs-implementation drift caught" table above).
+- Memory files at `C:\Users\lotan\.claude\projects\c--Users-lotan-Projects-Upwind\memory\` — 13 files capturing user preferences, project plan, demo strategy, **live deploy state** (`project_deploy_state.md` — URLs, GCP IDs, IAM, env vars), and Upwind research. The `MEMORY.md` index lists all of them.

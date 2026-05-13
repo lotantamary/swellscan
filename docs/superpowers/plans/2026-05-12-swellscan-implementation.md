@@ -1,6 +1,43 @@
 # Swellscan Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **⚠️ READ-BEFORE-EXECUTE — the code blocks in this plan are a LOGIC SPEC, not source of truth.** This plan was written speculatively in one pass with no code execution. Several tasks contain code that has a logic bug, a stale field reference, or a missing dependency that only surfaced under `pytest` or `docker run`. The rule (captured in the `feedback_plan_code_is_spec_not_source.md` memory): trace each planned code block mentally against the planned test BEFORE writing anything; reconstruct the body deliberately; surface discovered bugs in the recap (they make great interview stories). See **Known plan-vs-implementation drift** below for the bugs found so far.
+
+## Progress (as of 2026-05-12)
+
+**Phases 0–4 complete — Tasks 1–21 of 39 done. Backend is deployed live on Cloud Run.**
+
+- **Live backend URL:** `https://swellscan-backend-102679409749.us-central1.run.app`
+- **Tests:** 40 passing (`pytest` from repo root)
+- **GCP project:** `swellscan-prod` (number `102679409749`) owned by `swellscan.demo@gmail.com`
+- **What's next:** **Phase 5 — Apps Script Add-on (Tasks 22–28).** First non-backend phase. JavaScript (V8) in Google Workspace runtime.
+
+### Completed tasks (with commit SHAs)
+
+| Phase | Tasks | Commits |
+|---|---|---|
+| Phase 0 — Foundations | 1–5 | `fec9e6c`, `84bd9ab`, `64d6d88`, `6a0e00d`, `0f37c9c` |
+| Phase 1 — Auth | 6 | `dbf3151` |
+| Phase 2 — Detectors + clients | 7–13 | `99adbec`, `f33a867`, `973f657`, `a798bbc`, `6911f42`, `8f464fc`, `e0c69cd` |
+| Phase 3 — LLM + pipeline + endpoint | 14–17 | `88439b3`, `3a2c78b`, `137921c`, `9b3354c` |
+| Phase 4 — Deployment | 18–21 | `5f50dcc`, `28e35a0`, (Cloud Run deploy + demo Gmail — runtime actions, no commits) |
+
+### Known plan-vs-implementation drift (bugs caught during execution)
+
+| Task | Planned bug | Symptom | Fix |
+|---|---|---|---|
+| 8 (headers) | `make_email` defaulted `message_id_header` to empty, so the detector always emitted `MISSING_MESSAGE_ID` (LOW); planned test asserted "all evidence on happy path is INFO" | Test 1 failed against planned implementation | Added `message_id_header` default to the fixture |
+| 9 (sender) | `DISPLAY_NAME_DOMAIN_MISMATCH` check used `not any(brand in d for d in legit_domains + [from_domain])` — always False because the brand is always a substring of its own legit domain | Test 2 failed; detector could never emit this signal | Replaced with `from_domain not in legit_domains` |
+| 19 (Dockerfile) | `requirements.txt` was missing `requests`, which `google-auth` needs at runtime. Hidden locally because `pip-audit` (dev dep) pulled `requests` in transitively | Container `ImportError` at startup; would have failed Cloud Build | Added explicit `requests==2.34.0` to `requirements.txt` |
+
+### What's next — Phase 5 (Add-on)
+
+Task 22 (`appsscript.json` manifest) → Task 23 (`setup.gs`) → Task 24 (`client.gs` — the OIDC HTTP wrapper, needs the live backend URL `https://swellscan-backend-102679409749.us-central1.run.app`) → Task 25 (`render.gs` — invoke `frontend-design:frontend-design` skill before writing the card builder) → Task 26 (`Code.gs` trigger + state routing) → Task 27 (`baseline.gs` — `UserProperties` with `LockService`) → Task 28 (install + smoke test).
+
+The deploy-state memory (`project_deploy_state.md`) has every concrete value Phase 5 needs: live URL, allowlisted user, OIDC audience, secret names. **Phase 5 will not require any changes to the backend.**
+
+---
 
 **Goal:** Build the Swellscan Gmail Add-on per [the design spec](../specs/2026-05-12-swellscan-design.md) — a layered email-maliciousness scorer that ships a Python/FastAPI backend on Cloud Run and an Apps Script add-on for Gmail, end-to-end demoable by Fri 2026-05-15.
 

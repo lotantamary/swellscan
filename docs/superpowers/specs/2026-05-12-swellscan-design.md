@@ -8,8 +8,9 @@
 | **Context** | Upwind Security Bootcamp home assignment |
 | **Submission deadline** | Fri 2026-05-15 EOD |
 | **Demo interview** | Scheduled by author after submission (~Mon 2026-05-18) |
-| **Status** | Design approved — implementation planning next |
-| **Last revised** | 2026-05-12 |
+| **Status** | Backend implementation complete + deployed to Cloud Run (Tasks 1–21 of 39); Phase 5 (Apps Script Add-on) next |
+| **Live backend URL** | `https://swellscan-backend-102679409749.us-central1.run.app` |
+| **Last revised** | 2026-05-12 (status only — design decisions unchanged) |
 
 ---
 
