@@ -107,14 +107,22 @@ function buildVerdictCard(verdict) {
         .setBottomLabel(truncate(e.explanation || '', 200))
         .setWrapText(true);
       // Prefer the newer setStartIcon(IconImage) over the legacy setIconUrl -
-      // the IconImage path lets CardService crop our solid-fill dot PNGs to
-      // a circle and renders more reliably than a raw URL.
-      widget.setStartIcon(
-        CardService.newIconImage()
-          .setIconUrl(dotUrl)
-          .setImageType(CardService.ImageType.CIRCLE)
-          .setAltText(String(e.severity || 'severity'))
-      );
+      // the IconImage path renders more reliably and lets CardService crop
+      // our solid-fill PNG to a circle on runtimes that support it.
+      const iconImage = CardService.newIconImage()
+        .setIconUrl(dotUrl)
+        .setAltText(String(e.severity || 'severity'));
+      try {
+        // CardService.ImageStyle.CIRCLE crops the icon to a circle. If
+        // this Apps Script version doesn't expose it, the icon renders as
+        // a colored square instead - still a visible dot, just sharper
+        // corners. Defensive try/catch so a missing enum can't crash the
+        // whole card render.
+        iconImage.setImageStyle(CardService.ImageStyle.CIRCLE);
+      } catch (err) {
+        // Square fallback; intentional no-op.
+      }
+      widget.setStartIcon(iconImage);
       section.addWidget(widget);
     });
     card.addSection(section);
