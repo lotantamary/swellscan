@@ -23,9 +23,11 @@ function onGmailMessageOpen(e) {
     const payload = buildEmailPayload(messageId, accessToken);
     const verdict = callBackend(payload);
 
-    // Attach presentation-only fields the card builder expects.
-    verdict.subject = payload.subject;
-    verdict.sender = formatSender(payload.from);
+    // Attach presentation-only fields the card builder expects. We do NOT
+    // attach verdict.subject / verdict.sender any more - the card no
+    // longer has a subject+sender section because the email is already
+    // visible behind/above the Add-on sidebar, and if the sender is the
+    // problem the detectors call it out in a specific finding row.
     verdict.detectors_fired = countDetectorsFired(verdict.evidence);
     verdict.llm_invoked = (verdict.detectors_run || []).indexOf('llm') !== -1;
 
@@ -40,17 +42,6 @@ function onGmailMessageOpen(e) {
   } catch (err) {
     return [buildErrorCard(err)];
   }
-}
-
-/**
- * "Display Name <addr@host>" format, falling back to bare address if no
- * display name. This is what the card's sender line shows verbatim.
- */
-function formatSender(from) {
-  if (from && from.display_name && from.address) {
-    return from.display_name + ' <' + from.address + '>';
-  }
-  return (from && from.address) || '';
 }
 
 /**

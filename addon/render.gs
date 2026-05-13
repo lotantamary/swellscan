@@ -70,22 +70,14 @@ function buildVerdictCard(verdict) {
       )
   );
 
-  // 3. Subject + sender (the user verifies the lookalike domain with their own eyes).
-  card.addSection(
-    CardService.newCardSection()
-      .addWidget(
-        CardService.newTextParagraph().setText(
-          '<b>' + escapeHtml(truncate(verdict.subject || '', 80)) + '</b>'
-        )
-      )
-      .addWidget(
-        CardService.newTextParagraph().setText(
-          '<font color="#5f6368">' + escapeHtml(verdict.sender || '') + '</font>'
-        )
-      )
-  );
+  // (Removed 2026-05-13: the subject + sender section. The email is
+  // already visible behind / above the Add-on sidebar in Gmail, so
+  // restating it here was redundant. If the sender is the problem, the
+  // detectors emit a finding that calls out the specific issue - the
+  // findings section below covers the same information at the moment
+  // it actually matters. See plan Task 25 design pass for the decision.)
 
-  // 4. Summary: bold + palette-colored opener, line break, italic body.
+  // 3. Summary: bold + palette-colored opener, line break, italic body.
   if (verdict.summary) {
     const parts = splitOpener(verdict.summary);
     const summaryHtml =
@@ -98,7 +90,7 @@ function buildVerdictCard(verdict) {
     );
   }
 
-  // 5. Findings: top 5 sorted by severity then confidence.
+  // 4. Findings: top 5 sorted by severity then confidence.
   if (findings.length > 0) {
     const section = CardService.newCardSection();
     const signalWord = findings.length === 1 ? 'signal' : 'signals';
@@ -134,7 +126,7 @@ function buildVerdictCard(verdict) {
     card.addSection(section);
   }
 
-  // 6. Action button - stub-wired (real action lives in Task 36.5 stretch).
+  // 5. Action button - stub-wired (real action lives in Task 36.5 stretch).
   //
   // Two-path rendering:
   //   Preferred  - centered button in a regular section via ButtonSet's
