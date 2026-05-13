@@ -2612,6 +2612,8 @@ git commit -m "feat(addon): HTTP client with OIDC + payload builder from current
 
   In-scope for redesign: information hierarchy, layout, copy, typography, color, the visual "character arc" across SAFE/SUSPICIOUS/MALICIOUS, even the wave metaphor itself if a better one exists.
 
+  Also in-scope (deferred from Task 22 audit, 2026-05-13): the OAuth consent screen's `logoUrl` in `addon/appsscript.json` currently points at Google's generic script icon (`https://ssl.gstatic.com/docs/script/images/logo/script-64.png`). The consent screen is the very first surface a user (and an interviewer testing install) sees — a generic icon there silently undercuts the rest of the brand work. As part of this task's design pass, decide whether to ship a real Swellscan logo (likely a small new public endpoint on the backend, e.g. `GET /logo.png` returning a square PNG/SVG, mirroring the existing public `/illustration/{label}` pattern) or to consciously accept the placeholder and document why. If shipping a real logo, update `addon/appsscript.json` in the same task.
+
   Locked (do NOT propose changes to): the `Verdict` JSON contract, the live `/illustration/{label}` URL contract, the `/score` endpoint, signal taxonomy, scoring math.
 
 - [ ] **Step 1: Create `addon/render.gs`**
