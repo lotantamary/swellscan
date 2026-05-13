@@ -3367,6 +3367,11 @@ git commit -m "feat(scoring): add correlation engine (3 hand-curated signal-set 
 
 **Origin (2026-05-13, Task 28 first live install).** When the verdict card rendered against the demo Gmail account, the summary body under the lifeguard opener read as three disjoint sentences stitched together: *"Body contains a long base64-like string - may be an encoded payload. SPF passed. DKIM signature valid."* That text is exactly the `explanation` field of the top-3 evidence items, concatenated by `Pipeline._summarize()` in `backend/pipeline.py`. It is correct but choppy. Lotan flagged at the live install: *"In general, I would just like it to be what's going on in simple words."* All decisions below are **discussable - revisit when we get here.**
 
+**Locked requirements (2026-05-13, Phase 6 sequencing call):**
+- **Body stays lean and focused.** One sentence, plain words, no jargon dump. The lifeguard opener already carries the emotional weight; the body just says what is happening in human terms.
+- **SAFE card body is part of this task, not a follow-up.** Whatever path we take (A / B / hybrid), the SAFE state must get the same readability treatment as SUSPICIOUS / MALICIOUS. No leaving SAFE with the old concatenation. If we go hybrid A+B, the B template for SAFE has to read as cleanly as the LLM output for the other two states.
+- **Brainstorm A vs B vs hybrid one more time before writing code.** Lotan likes A+B but wants to re-confirm the split at execution time, not lock it from the plan.
+
 **Three real paths, pick one:**
 
 | Path | What changes | Effort | Trade-offs |
