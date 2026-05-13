@@ -144,6 +144,32 @@ The ones most important to read FIRST for the upcoming work:
 Then Phase 6 covers polish, security review, threat-research stretch, README, submission.
 
 ═══════════════════════════════════════════════════════════════════════
+## DESIGN IS NOT WHERE I WANT IT — actively improve it
+═══════════════════════════════════════════════════════════════════════
+
+I am **not satisfied** with the current visual design and I want us to make it materially better during Phase 5. The wave-themed direction is approved, but treat the design spec's visual side as a STARTING POINT, NOT A SPEC TO REPRODUCE.
+
+This applies to:
+  - The Add-on verdict card (Task 25 — primary focus)
+  - The wave SVG illustration generator (Task 18 — already deployed, but you can revisit it if you have a meaningfully better take that doesn't break the public `/illustration/{label}` URL contract)
+  - Information hierarchy, copy, typography, color choices, layout
+  - The visual "character arc" across SAFE / SUSPICIOUS / MALICIOUS — currently a beach scene; if a different metaphor or execution would land harder on the recruiter, surface it
+
+Specifically NOT in scope to change (these are LOCKED):
+  - The data model (`Email`, `Evidence`, `Verdict` — backend speaks these)
+  - The signal taxonomy (the enum of detection signals)
+  - The scoring math (thresholds, weights, aggregator)
+  - OIDC / auth boundary
+  - The deployed `/score` API contract
+
+How to approach this:
+  - Before writing any visual code, set aside the planned implementation in the design spec and Task 25's planned `render.gs`. Think first about *what would actually be excellent here* — what would make the recruiter remember this card vs. the next candidate's.
+  - Bring me 2–3 concrete directions (with rationale tied to the rubric — creativity, product thinking) BEFORE writing. Wait for me to pick one.
+  - The goal is "make it better," not "faithfully reproduce the spec."
+
+Treat improvements that help the demo or interview narrative as wins, not deviations.
+
+═══════════════════════════════════════════════════════════════════════
 ## IMMEDIATE NEXT ACTION
 ═══════════════════════════════════════════════════════════════════════
 

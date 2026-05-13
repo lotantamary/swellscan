@@ -2599,6 +2599,18 @@ git commit -m "feat(addon): HTTP client with OIDC + payload builder from current
 
 - [ ] **Step 0: Invoke `frontend-design:frontend-design` skill** to refresh anti-AI-slop design heuristics. CardService heavily constrains styling, but widget choice, label copy, information hierarchy, and the scoring-vs-findings split are all design decisions where the skill's principles apply.
 
+  ⚠️ **READ THIS BEFORE WRITING ANY CODE FOR THIS TASK.** Per the user's directive in `.claude/HANDOVER.md` (section "DESIGN IS NOT WHERE I WANT IT"): the user is NOT satisfied with the current visual design and wants it actively improved during Phase 5. Treat the `render.gs` code block below as ONE possible direction, not a target to reproduce.
+
+  Required flow:
+  1. Set aside the design-spec UI section and the planned code below.
+  2. Think about what would actually be excellent for this card — what makes the recruiter remember Swellscan over the next candidate's project.
+  3. Bring the user 2–3 concrete directions (with rationale tied to rubric items — creativity, product thinking, security awareness) BEFORE writing any code.
+  4. Wait for the user to pick one. THEN write it.
+
+  In-scope for redesign: information hierarchy, layout, copy, typography, color, the visual "character arc" across SAFE/SUSPICIOUS/MALICIOUS, even the wave metaphor itself if a better one exists.
+
+  Locked (do NOT propose changes to): the `Verdict` JSON contract, the live `/illustration/{label}` URL contract, the `/score` endpoint, signal taxonomy, scoring math.
+
 - [ ] **Step 1: Create `addon/render.gs`**
 
 ```javascript
