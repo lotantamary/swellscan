@@ -6,6 +6,7 @@ from backend.models.email import Email
 from backend.models.evidence import Evidence, Severity, Signal
 
 RISKY_EXTENSIONS = {
+    # Executables and scripts (V1)
     ".exe",
     ".scr",
     ".js",
@@ -21,6 +22,17 @@ RISKY_EXTENSIONS = {
     ".msi",
     ".hta",
     ".lnk",
+    # V2 additions (2026-05-13, research-driven):
+    # SVG with embedded JS - up from 0.1% to 4.9% of phishing attachments in 2025 (KnowBe4, IBM X-Force)
+    ".svg",
+    # HTML smuggling - JS builds payload client-side via blob URLs, bypasses gateways
+    ".html",
+    ".htm",
+    # Container files that bypass Mark-of-the-Web (auto-mount; MotW does not propagate to inner files)
+    ".iso",
+    ".img",
+    ".vhd",
+    ".vhdx",
 }
 # Inner extensions that legitimately appear in compound names (".pdf.exe" etc.)
 # - used as the "first half" trigger for the double-extension check.

@@ -4,7 +4,7 @@ import pytest
 
 from backend.detectors.attachments import AttachmentsDetector
 from backend.models.email import AttachmentMeta
-from backend.models.evidence import Signal
+from backend.models.evidence import Severity, Signal
 from tests.fixtures.emails import make_email
 
 
@@ -53,3 +53,29 @@ async def test_risky_extension_flagged():
     vt.file_hash_reputation.return_value = {"found": False}
     evs = await AttachmentsDetector(vt=vt).run(email)
     assert any(e.signal == Signal.ATTACHMENT_RISKY_EXTENSION for e in evs)
+
+
+# V2.S1: 2025-trending malicious-attachment extensions (research finding #4)
+@pytest.mark.parametrize(
+    "ext,filename",
+    [
+        (".svg", "invoice.svg"),
+        (".html", "verification.html"),
+        (".htm", "doc.htm"),
+        (".hta", "installer.hta"),
+        (".iso", "delivery.iso"),
+        (".img", "image.img"),
+        (".vhd", "backup.vhd"),
+        (".vhdx", "snapshot.vhdx"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_v2_risky_extension_added(ext, filename):
+    """V2.S1: each newly-added extension fires ATTACHMENT_RISKY_EXTENSION at HIGH."""
+    email = make_email(attachments=[make_att(filename=filename)])
+    vt = AsyncMock()
+    vt.file_hash_reputation.return_value = {"found": False}
+    evs = await AttachmentsDetector(vt=vt).run(email)
+    risky = [e for e in evs if e.signal == Signal.ATTACHMENT_RISKY_EXTENSION]
+    assert len(risky) == 1, f"{ext} should fire ATTACHMENT_RISKY_EXTENSION"
+    assert risky[0].severity == Severity.HIGH
