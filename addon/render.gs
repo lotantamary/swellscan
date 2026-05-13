@@ -116,10 +116,17 @@ function buildVerdictCard(verdict) {
         escapeHtml(prettySignal(e.signal)) +
         (mitre ? ' &middot; ' + escapeHtml(mitre) : '');
 
+      // Pad the bottom-label body with leading non-breaking spaces so
+      // it visually aligns under the title text rather than under the
+      // bullet. setBottomLabel takes plain text (no HTML), so we use
+      // the actual Unicode NBSP codepoint ( ). Four NBSPs is a
+      // close visual match to the bullet + 2-space prefix width.
+      const bodyText = '    ' + truncate(e.explanation || '', 200);
+
       section.addWidget(
         CardService.newDecoratedText()
           .setText(titleHtml)
-          .setBottomLabel(truncate(e.explanation || '', 200))
+          .setBottomLabel(bodyText)
           .setWrapText(true)
       );
     });
