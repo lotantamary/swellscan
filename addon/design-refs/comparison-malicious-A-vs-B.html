@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Swellscan card mockup - A vs B (MALICIOUS state)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 48px 24px 64px;
+      background: #1f1f1f;
+      color: #f5f5f5;
+      font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1 { font-weight: 400; font-size: 18px; opacity: 0.7; text-align: center; margin: 0 0 8px; letter-spacing: 0.02em; }
+    h2 { font-weight: 400; font-size: 13px; opacity: 0.5; text-align: center; margin: 0 0 40px; letter-spacing: 0.05em; text-transform: uppercase; }
+    .row { display: flex; gap: 80px; justify-content: center; flex-wrap: wrap; }
+    .col { display: flex; flex-direction: column; align-items: center; }
+    .tag {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.55;
+      margin-bottom: 4px;
+    }
+    .tag-name { font-size: 18px; opacity: 1; letter-spacing: 0; text-transform: none; font-weight: 500; margin-bottom: 18px; }
+
+    .card {
+      width: 300px;
+      background: #ffffff;
+      color: #1a1a1a;
+      border-radius: 10px;
+      box-shadow: 0 6px 28px rgba(0,0,0,0.45);
+      overflow: hidden;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .hero {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .section { padding: 14px 16px; border-bottom: 1px solid #ececec; }
+    .section:last-of-type { border-bottom: none; }
+
+    .verdict-row { display: flex; align-items: baseline; gap: 10px; }
+    .score { font-size: 30px; font-weight: 700; color: #1f3a4d; letter-spacing: -0.02em; line-height: 1; }
+    .score-units { font-size: 13px; font-weight: 500; color: #8a8a8a; }
+    .verdict-label {
+      font-size: 13px; font-weight: 700;
+      color: #b8442b;
+      letter-spacing: 0.12em;
+      padding: 4px 9px;
+      background: rgba(184,68,43,0.10);
+      border-radius: 4px;
+    }
+    .confidence-row { margin-top: 8px; font-size: 11px; color: #6e6e6e; letter-spacing: 0.04em; }
+    .confidence-row strong { color: #1f3a4d; font-weight: 600; }
+
+    .subject {
+      font-size: 13px; font-weight: 600; color: #1a1a1a;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sender {
+      font-size: 12px; color: #6e6e6e; margin-top: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .summary { font-size: 13px; line-height: 1.55; color: #2a2a2a; }
+    .b .summary { font-family: "Iowan Old Style", Georgia, "Times New Roman", serif; font-size: 13.5px; line-height: 1.5; color: #1a1a1a; }
+
+    .findings-header {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      color: #8a8a8a; margin-bottom: 10px;
+    }
+    .finding { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
+    .finding:last-child { margin-bottom: 0; }
+    .dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; }
+    .dot-high { background: #b8442b; }
+    .dot-med  { background: #d49a3f; }
+    .dot-low  { background: #6e9c87; }
+    .f-title { font-size: 12px; font-weight: 600; color: #1a1a1a; }
+    .f-mitre { color: #8a8a8a; font-weight: 400; font-size: 11px; margin-left: 4px; }
+    .f-explain { font-size: 11px; color: #4a4a4a; margin-top: 3px; }
+
+    .footer-btn {
+      display: block; width: 100%;
+      background: #b8442b; color: #fff; border: none;
+      padding: 13px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
+      cursor: pointer;
+    }
+    .meta {
+      font-size: 10px; color: #9a9a9a;
+      padding: 8px 16px; background: #f8f6f1; border-top: 1px solid #ececec;
+      letter-spacing: 0.04em;
+    }
+
+    .voice-samples {
+      margin: 56px auto 0; max-width: 760px;
+      font-size: 13px; line-height: 1.7; opacity: 0.85;
+    }
+    .voice-samples h3 { font-weight: 500; font-size: 14px; opacity: 0.7; margin-bottom: 12px; letter-spacing: 0.02em; }
+    .voice-samples ul { padding-left: 20px; }
+    .voice-samples li { margin-bottom: 10px; }
+    .voice-samples li strong { color: #f4c95d; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Swellscan card - A vs B</h1>
+  <h2>MALICIOUS state · score 87/100</h2>
+
+  <div class="row">
+
+    <div class="col a">
+      <div class="tag">Direction A</div>
+      <div class="tag-name">Painted Verdict</div>
+      <div class="card">
+        <img class="hero" src="../../backend/illustration/assets/malicious.png" alt="malicious">
+        <div class="section">
+          <div class="verdict-row">
+            <span class="score">87<span class="score-units">/100</span></span>
+            <span class="verdict-label">MALICIOUS</span>
+          </div>
+          <div class="confidence-row">confidence <strong>HIGH</strong> · 4 detectors fired</div>
+        </div>
+        <div class="section">
+          <div class="subject">Microsoft account verification required immediately</div>
+          <div class="sender">Microsoft Support &lt;support@micros0ft-secure.com&gt;</div>
+        </div>
+        <div class="section">
+          <div class="summary">
+            Three independent signals indicate a credential-harvesting attempt. The sender domain mimics microsoft.com, the embedded link is on a known phishing host, and the message failed sender authentication. Do not click any links in this message.
+          </div>
+        </div>
+        <div class="section">
+          <div class="findings-header">Findings</div>
+          <div class="finding">
+            <div class="dot dot-high"></div>
+            <div>
+              <div class="f-title">Lookalike domain<span class="f-mitre">· T1566.002</span></div>
+              <div class="f-explain">micros0ft-secure.com substitutes a zero for the &ldquo;o&rdquo; in microsoft</div>
+            </div>
+          </div>
+          <div class="finding">
+            <div class="dot dot-high"></div>
+            <div>
+              <div class="f-title">Known malicious URL<span class="f-mitre">· T1566.002</span></div>
+              <div class="f-explain">Embedded link flagged as phishing by VirusTotal</div>
+            </div>
+          </div>
+          <div class="finding">
+            <div class="dot dot-med"></div>
+            <div>
+              <div class="f-title">SPF authentication failed<span class="f-mitre">· T1566</span></div>
+              <div class="f-explain">Sender domain did not pass SPF check</div>
+            </div>
+          </div>
+        </div>
+        <button class="footer-btn">Report &amp; delete</button>
+        <div class="meta">scanned in 1.8s · LLM consulted</div>
+      </div>
+    </div>
+
+    <div class="col b">
+      <div class="tag">Direction B</div>
+      <div class="tag-name">Surfer&rsquo;s Log</div>
+      <div class="card">
+        <img class="hero" src="../../backend/illustration/assets/malicious.png" alt="malicious">
+        <div class="section">
+          <div class="verdict-row">
+            <span class="score">87<span class="score-units">/100</span></span>
+            <span class="verdict-label">MALICIOUS</span>
+          </div>
+          <div class="confidence-row">confidence <strong>HIGH</strong> · 4 detectors fired</div>
+        </div>
+        <div class="section">
+          <div class="subject">Microsoft account verification required immediately</div>
+          <div class="sender">Microsoft Support &lt;support@micros0ft-secure.com&gt;</div>
+        </div>
+        <div class="section">
+          <div class="summary">
+            Out of the water on this one - three warning flags went up at the same time. The sender is faking the brand, the link points to a known phishing host, and the message couldn&rsquo;t prove who sent it. Don&rsquo;t tap a thing in here.
+          </div>
+        </div>
+        <div class="section">
+          <div class="findings-header">Findings</div>
+          <div class="finding">
+            <div class="dot dot-high"></div>
+            <div>
+              <div class="f-title">Lookalike domain<span class="f-mitre">· T1566.002</span></div>
+              <div class="f-explain">micros0ft-secure.com substitutes a zero for the &ldquo;o&rdquo; in microsoft</div>
+            </div>
+          </div>
+          <div class="finding">
+            <div class="dot dot-high"></div>
+            <div>
+              <div class="f-title">Known malicious URL<span class="f-mitre">· T1566.002</span></div>
+              <div class="f-explain">Embedded link flagged as phishing by VirusTotal</div>
+            </div>
+          </div>
+          <div class="finding">
+            <div class="dot dot-med"></div>
+            <div>
+              <div class="f-title">SPF authentication failed<span class="f-mitre">· T1566</span></div>
+              <div class="f-explain">Sender domain did not pass SPF check</div>
+            </div>
+          </div>
+        </div>
+        <button class="footer-btn">Report &amp; delete</button>
+        <div class="meta">scanned in 1.8s · LLM consulted</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="voice-samples">
+    <h3>Direction B - blended lifeguard + surfer voice across all three states</h3>
+    <ul>
+      <li><strong>SAFE.</strong> All clear, you can paddle. Sender&rsquo;s a regular, the link checks out, the message authenticated cleanly.</li>
+      <li><strong>SUSPICIOUS.</strong> Something off about this set. The sender has been flaky on authentication lately and one signal lit up - give it a careful read before tapping anything.</li>
+      <li><strong>MALICIOUS.</strong> Out of the water on this one - three warning flags went up at the same time. The sender is faking the brand, the link points to a known phishing host, and the message couldn&rsquo;t prove who sent it. Don&rsquo;t tap a thing in here.</li>
+    </ul>
+  </div>
+
+</body>
+</html>

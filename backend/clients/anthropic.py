@@ -19,7 +19,7 @@ class LLMVerdict(BaseModel):
 
 
 # Sequences in the body that look like a closing delimiter for our prompt
-# wrapper get zero-width chars inserted between '<' and '/' — visually identical
+# wrapper get zero-width chars inserted between '<' and '/' - visually identical
 # to a human but breaks the regex an attacker would use to escape the sandbox.
 _TAG_ESCAPE_RE = re.compile(
     r"</(untrusted|system|instruction|prompt|evidence|email)",
@@ -48,7 +48,7 @@ class AnthropicClient:
         email_metadata: str,
         body: str,
     ) -> LLMVerdict | None:
-        # Random per-request suffix on the wrapper tag — attackers can't
+        # Random per-request suffix on the wrapper tag - attackers can't
         # preemptively close it because they don't know the suffix.
         suffix = secrets.token_hex(8)
         sanitized = _sanitize_body(body)[:10_000]

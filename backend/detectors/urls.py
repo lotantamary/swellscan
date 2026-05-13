@@ -32,7 +32,7 @@ class UrlsDetector(Detector):
     ):
         self._vt = vt or VirusTotalClient()
         self._sb = sb or SafeBrowsingClient()
-        # urlscan client is wired but unused in v1 — reserved for the
+        # urlscan client is wired but unused in v1 - reserved for the
         # behavioral-evidence stretch in Task 33 (final redirect chain,
         # screenshot reference). Keeping the slot avoids a constructor
         # change later when we plug it in.
@@ -65,7 +65,7 @@ class UrlsDetector(Detector):
                         signal=Signal.URL_SHORTENER,
                         severity=Severity.LOW,
                         confidence=0.7,
-                        explanation=f"URL uses a known shortener ({host}) — destination is hidden.",
+                        explanation=f"URL uses a known shortener ({host}) - destination is hidden.",
                         mitre_techniques=["T1566.002"],
                         details={"url": url},
                         detector=self.name,

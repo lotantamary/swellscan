@@ -60,7 +60,7 @@ class SenderBaselineDetector(Detector):
                         severity=Severity.MEDIUM,
                         confidence=0.7,
                         explanation=(
-                            f"Email arrived at {current_hour:02d}:00 — outside this sender's typical "
+                            f"Email arrived at {current_hour:02d}:00 - outside this sender's typical "
                             f"send hours ({sorted(history.typical_send_hours)})."
                         ),
                         mitre_techniques=["T1656"],

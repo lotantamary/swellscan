@@ -28,7 +28,7 @@ TAG_ESCAPE_PATTERN = re.compile(
 # The character class below contains, in order:
 #   U+200B zero-width space, U+200C zero-width non-joiner,
 #   U+200D zero-width joiner, U+2060 word joiner, U+FEFF byte-order mark.
-# Each is intentionally invisible in editors — see the codepoint comment above.
+# Each is intentionally invisible in editors - see the codepoint comment above.
 ZERO_WIDTH_PATTERN = re.compile("[​‌‍⁠﻿]")
 BASE64_BLOB_PATTERN = re.compile(r"[A-Za-z0-9+/]{80,}={0,2}")
 
@@ -83,7 +83,7 @@ class PromptInjectionDetector(Detector):
                     signal=Signal.SUSPICIOUS_UNICODE_IN_BODY,
                     severity=Severity.MEDIUM,
                     confidence=0.7,
-                    explanation="Body contains zero-width or invisible Unicode characters — common in evasion attempts.",
+                    explanation="Body contains zero-width or invisible Unicode characters - common in evasion attempts.",
                     mitre_techniques=["T1027"],
                     details={},
                     detector=self.name,
@@ -96,7 +96,7 @@ class PromptInjectionDetector(Detector):
                     signal=Signal.ENCODED_PAYLOAD_IN_BODY,
                     severity=Severity.MEDIUM,
                     confidence=0.6,
-                    explanation="Body contains a long base64-like string — may be an encoded payload.",
+                    explanation="Body contains a long base64-like string - may be an encoded payload.",
                     mitre_techniques=["T1027"],
                     details={},
                     detector=self.name,

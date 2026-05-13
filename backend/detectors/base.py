@@ -15,7 +15,7 @@ class Detector(ABC):
     async def run(self, email: Email) -> list[Evidence]: ...
 
     async def safe_run(self, email: Email) -> list[Evidence]:
-        """Wraps run() with exception isolation — never raises."""
+        """Wraps run() with exception isolation - never raises."""
         try:
             return await self.run(email)
         except Exception as exc:

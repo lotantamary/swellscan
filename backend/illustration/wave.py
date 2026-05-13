@@ -31,7 +31,7 @@ PALETTE = {
     },
 }
 
-# Wave path per state — `M x,y ... Z` defines the water silhouette.
+# Wave path per state - `M x,y ... Z` defines the water silhouette.
 # SAFE: gentle rolling wave. SUSPICIOUS: choppier alternating peaks/troughs.
 # MALICIOUS: a single large breaking wave (cubic curves).
 WAVE_PATHS = {

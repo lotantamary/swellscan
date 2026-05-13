@@ -23,7 +23,7 @@ RISKY_EXTENSIONS = {
     ".lnk",
 }
 # Inner extensions that legitimately appear in compound names (".pdf.exe" etc.)
-# — used as the "first half" trigger for the double-extension check.
+# - used as the "first half" trigger for the double-extension check.
 COMMON_DECOY_EXTENSIONS = {".pdf", ".doc", ".xls", ".jpg", ".png"}
 
 
@@ -65,7 +65,7 @@ class AttachmentsDetector(Detector):
                         signal=Signal.ATTACHMENT_DOUBLE_EXTENSION,
                         severity=Severity.HIGH,
                         confidence=1.0,
-                        explanation=f"Attachment {att.filename} uses a double extension — common disguise technique.",
+                        explanation=f"Attachment {att.filename} uses a double extension - common disguise technique.",
                         mitre_techniques=["T1566.001"],
                         details={"filename": att.filename},
                         detector=self.name,

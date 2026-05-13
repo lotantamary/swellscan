@@ -1,6 +1,6 @@
 """Scoring weights, thresholds, and (stretch) correlation bonuses.
 
-All scoring policy lives here — tunable in one place.
+All scoring policy lives here - tunable in one place.
 """
 from backend.models.evidence import Severity
 

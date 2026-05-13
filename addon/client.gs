@@ -31,7 +31,7 @@ function callBackend(emailPayload) {
 
 /**
  * Build the backend's expected Email payload from the currently-open Gmail
- * message. Everything that reaches the backend is shaped by this function —
+ * message. Everything that reaches the backend is shaped by this function -
  * it is the trust boundary between Gmail's data model and ours.
  */
 function buildEmailPayload(messageId, accessToken) {
@@ -85,7 +85,7 @@ function parseFromHeader(from) {
  *
  * RFC 5322 allows long headers to be *folded* across multiple physical lines,
  * where each continuation line starts with whitespace. A naive ^Name:(.+)$
- * regex would capture only the first line and silently drop the rest —
+ * regex would capture only the first line and silently drop the rest -
  * dangerous for Authentication-Results, which carries SPF/DKIM/DMARC verdicts
  * and is one of the most likely headers to be folded. So we unfold first
  * (continuation runs collapse to a single space) and then apply the regex.
@@ -125,7 +125,7 @@ function extractUrlsFromHtml(html) {
 /**
  * SHA-256 hex digest of attachment bytes. Apps Script's computeDigest returns
  * signed bytes (-128..127); we convert to unsigned and hex-encode each.
- * Result is exactly 64 hex chars — matches the backend Pydantic constraint.
+ * Result is exactly 64 hex chars - matches the backend Pydantic constraint.
  */
 function computeSha256(bytes) {
   const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes);

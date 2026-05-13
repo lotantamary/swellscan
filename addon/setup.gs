@@ -5,7 +5,7 @@
  * Apps Script editor, select the `setup` function in the toolbar dropdown,
  * and click Run. Approve OAuth scopes when prompted. The backend URL and
  * OIDC audience are written to ScriptProperties (project-level, shared
- * across all users of this Add-on) — every later call reads them from
+ * across all users of this Add-on) - every later call reads them from
  * there instead of hardcoding values into source.
  */
 function setup() {
@@ -21,7 +21,7 @@ function setup() {
 }
 
 /**
- * Returns the configured backend URL. Throws if setup has not been run yet —
+ * Returns the configured backend URL. Throws if setup has not been run yet -
  * a loud failure here is better than silently posting to "undefined/score".
  */
 function getBackendUrl() {
@@ -34,7 +34,7 @@ function getBackendUrl() {
 
 /**
  * Returns the OIDC audience claim that the backend expects in incoming ID
- * tokens. Falls back to BACKEND_URL when unset (current state — the two are
+ * tokens. Falls back to BACKEND_URL when unset (current state - the two are
  * identical for direct Cloud Run access). Kept as a separate property so a
  * future custom-domain deployment can change BACKEND_URL without breaking
  * token verification.
