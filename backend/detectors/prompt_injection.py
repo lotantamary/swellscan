@@ -32,6 +32,15 @@ TAG_ESCAPE_PATTERN = re.compile(
 ZERO_WIDTH_PATTERN = re.compile("[​‌‍⁠﻿]")
 BASE64_BLOB_PATTERN = re.compile(r"[A-Za-z0-9+/]{80,}={0,2}")
 
+# Strip http(s):// URLs AND data: URIs from the body before checking for
+# base64-like blobs. Marketing tracking URLs and inline base64-encoded
+# images legitimately contain long base64-shaped strings; neither is an
+# "encoded payload in body text" in the threat-model sense. URLs are the
+# URL detector's responsibility; inline images are normal HTML.
+# Without this, every marketing email with a tracking pixel or embedded
+# logo image fires a false ENCODED_PAYLOAD_IN_BODY finding.
+_URLS_AND_DATA_URIS = re.compile(r"(?:https?://|data:)\S+", re.I)
+
 # V2.S5: payload-fragmentation detection. Pattern: 5+ short (1-3 char) quoted
 # tokens close together (the splits), AND an assembly verb anywhere in body
 # (the reassembly hint). Both required to limit false positives - legitimate
@@ -101,7 +110,11 @@ class PromptInjectionDetector(Detector):
                 )
             )
 
-        if BASE64_BLOB_PATTERN.search(body):
+        # Scope the base64 check to body text outside URLs and inline
+        # data: images. Without this, marketing emails with tracking
+        # pixels or embedded logo images fire a false-positive.
+        body_for_payload_check = _URLS_AND_DATA_URIS.sub("", body)
+        if BASE64_BLOB_PATTERN.search(body_for_payload_check):
             out.append(
                 Evidence(
                     signal=Signal.ENCODED_PAYLOAD_IN_BODY,

@@ -80,3 +80,46 @@ async def test_clean_body_emits_nothing():
         make_email(body_text="Hello, please find attached the report.")
     )
     assert evs == []
+
+
+@pytest.mark.asyncio
+async def test_base64_inside_url_does_not_fire_encoded_payload():
+    """Task 31 Phase A catch: marketing tracking URLs contain long opaque
+    tokens that look base64-shaped. They are URL-detector territory, not
+    encoded-payload-in-body. Without the URL strip pre-pass, every
+    marketing email with a tracking pixel fired a false-positive
+    ENCODED_PAYLOAD_IN_BODY. Discovered when scanning the Anthropic
+    billing receipt and the Google Cloud welcome email - both legitimate
+    SAFE emails produced a noisy 'long base64-like string' finding."""
+    body = (
+        "Hi there, please review your account. "
+        "Read more at https://anthropic.com/track/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "
+        "Thanks."
+    )
+    evs = await PromptInjectionDetector().run(make_email(body_text=body, body_html=""))
+    assert not any(e.signal == Signal.ENCODED_PAYLOAD_IN_BODY for e in evs)
+
+
+@pytest.mark.asyncio
+async def test_base64_inside_data_uri_does_not_fire_encoded_payload():
+    """Task 31 Phase A catch: inline base64 images (data:image/...;base64,)
+    are normal HTML, not malicious payloads. They legitimately contain
+    long base64-shaped strings."""
+    body = (
+        "Welcome email. "
+        '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==">'
+        " End."
+    )
+    evs = await PromptInjectionDetector().run(make_email(body_text="", body_html=body))
+    assert not any(e.signal == Signal.ENCODED_PAYLOAD_IN_BODY for e in evs)
+
+
+@pytest.mark.asyncio
+async def test_base64_blob_in_plain_text_still_fires():
+    """Regression: real encoded-payload-in-body attacks (a long base64
+    blob in the body text, not inside a URL) must STILL fire. The fix
+    narrows the false-positive surface; it does not disable the signal."""
+    blob = "AAAAAAAA" * 20  # 160 chars, plain text, not inside a URL
+    body = f"Decode this please: {blob}"
+    evs = await PromptInjectionDetector().run(make_email(body_text=body, body_html=""))
+    assert any(e.signal == Signal.ENCODED_PAYLOAD_IN_BODY for e in evs)

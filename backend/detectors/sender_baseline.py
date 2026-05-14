@@ -33,8 +33,21 @@ class SenderBaselineDetector(Detector):
         # signing domain drift
         m = DKIM_DOMAIN_RE.search(email.headers.authentication_results)
         current_signing = m.group(1).lower() if m else ""
-        if current_signing and current_signing not in (
-            d.lower() for d in history.typical_signing_domains
+        # Empty-baseline guard: drift is meaningful only when we have a
+        # recorded typical signing domain to compare against. An empty
+        # list means "no history yet" - the current signing-domain is the
+        # FIRST we've observed for this sender. Without this guard, every
+        # known-sender entry whose baseline was empty (e.g. because the
+        # pre-Task-30.5 regex never extracted anything) fires drift on
+        # the first scan after the regex was fixed. Matches the same
+        # empty-list guard already in place for typical_send_hours and
+        # typical_ip_prefixes below.
+        if (
+            current_signing
+            and history.typical_signing_domains
+            and current_signing not in (
+                d.lower() for d in history.typical_signing_domains
+            )
         ):
             out.append(
                 Evidence(
