@@ -1,5 +1,7 @@
 # Swellscan V2 - Research-driven enhancements
 
+> **STATUS (2026-05-14): COMPLETE AND DEPLOYED.** All V2.S1-V2.S9 tasks shipped via revisions `00009-v4n` (V2.S9), `00010-nm6` (V2.S11 covering V2.S10 fixes), `00011-bpj` (V2.S13 covering V2.S12 four-variant SAFE templates). V2.S10-V2.S13 are post-V2.S9 fixes documented in commits + CLAUDE.md "V2 tasks" table + `project_v2_complete.md` memory file - they're not in this plan because they were caught by live scan AFTER the plan was written.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
 > **⚠️ READ-BEFORE-EXECUTE - code blocks here are LOGIC SPEC, not source of truth.** Same skepticism rule as the main implementation plan: trace each planned code block mentally against the planned test before writing, scan for cross-task drift, surface bugs in the recap. See the parent plan at [2026-05-12-swellscan-implementation.md](2026-05-12-swellscan-implementation.md) for the full rule.

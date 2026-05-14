@@ -4,21 +4,23 @@ Swellscan is a Gmail Add-on that analyzes the currently-open email and produces 
 
 The design deliberately mirrors Upwind's own published architecture (RSAC 2026 malicious-prompt detector): three threat-class coverage areas (phishing-links, BEC, attachments) plus three deliberate stand-out moments — self-defending LLM, wave-themed verdict card with a character arc, and per-sender baselining. Submission deadline: **Fri 2026-05-15 EOD**.
 
-## Current State (updated 2026-05-13)
+## Current State (updated 2026-05-14, V2 complete)
 
-**Phases 0-5 complete (Tasks 1-28 of 39).** Backend AND the Gmail Add-on are built, deployed, and **installed live on the demo Gmail account**. The verdict card renders correctly in Gmail's right sidebar end-to-end.
+**V1 (Tasks 1-28 of parent plan) complete. V2 (V2.S1 - V2.S13, all 11 accepted research findings + 3 false-positive fixes + 4-variant SAFE body) complete and deployed.** Phase 6 starts at Task 29 (pre-seed demo UserProperties).
 
 - **Live URL:** [`https://swellscan-backend-102679409749.us-central1.run.app`](https://swellscan-backend-102679409749.us-central1.run.app/health) - `/health` returns `{"status":"ok"}`, `/score` is OIDC-protected (401 without a valid Google ID token), `/illustration/{label}` serves the static hero PNG (SAFE/SUSPICIOUS/MALICIOUS), `/dot/{severity}` serves the severity-dot icon, `/logo.png` serves the Swellscan brand logo. All static endpoints carry a 1-hour cache.
-- **Live revision:** `swellscan-backend-00008-gpx`.
-- **Tests:** **53 passing** (40 prior + 13 illustration/logo endpoint tests). `pytest` from repo root runs all.
+- **Live revision:** `swellscan-backend-00011-bpj` (V2.S13 deploy).
+- **Tests:** **125 passing** (53 V1 baseline + 72 V2 tests). `pytest` from repo root runs all.
+- **Detectors (8 total, was 7 in V1):** headers, sender, urls, attachments, prompt-injection, sender-baseline, llm, **plus new V2 detector `bec_language`** (payment-instruction-urgency BEC defense).
+- **New signals in V2 (3):** `PAYLOAD_FRAGMENTATION_ATTEMPT` (prompt-injection), `PAYMENT_INSTRUCTION_URGENCY` (bec_language), `RETURN_PATH_DOMAIN_MISMATCH` (headers). Also wired up the previously-dormant `ATTACHMENT_PASSWORD_PROTECTED_ARCHIVE` enum to a real detection rule.
 - **Three signature features built and verified end-to-end:**
-  1. **Self-defending LLM** - Task 10 prompt-injection detector + Task 14 hardened Anthropic client (random per-request wrapper tag, zero-width sanitization of closing-tag patterns, system-prompt trust-boundary instructions)
-  2. **Layered detection** - Task 15 pipeline + Task 4 thresholds (cheap deterministic detectors run in parallel; LLM invoked only when raw score >= 25)
+  1. **Self-defending LLM** - Task 10 prompt-injection detector + Task 14 hardened Anthropic client + V2.S2 defense-in-depth sanitization layer (hidden HTML strip, Unicode Tags block U+E0000-U+E007F strip, markdown image / reference-link strip, global zero-width strip, closing-tag-mimic neutralization)
+  2. **Layered detection with correlation engine** - Task 15 pipeline + Task 4 thresholds + V2.S7 correlation rules (4 attacker-playbook bonuses: credential-harvesting trio, AI-targeted, impersonation, thread-hijack signature)
   3. **Per-sender baseline** - Task 17 backend detector + Task 27 Add-on `UserProperties` writer with `LockService` + `message_id` ring-buffer idempotency
 - **GCP project:** `swellscan-prod` (project number `102679409749`), owned by `swellscan.demo@gmail.com`, billing on free trial. Three secrets in Secret Manager.
-- **OIDC_AUDIENCE** (updated 2026-05-13 during Task 28 Step 4.5): `812475821064-s838lvgcgmc1nj4lbjqivpa48usi4t8v.apps.googleusercontent.com` - the Apps Script project's OAuth client ID, NOT the Cloud Run URL. `ScriptApp.getIdentityToken()` returns a token with `aud` set to the script's OAuth client; the original Cloud Run URL value would 401 on every request.
-- **Card visual is LOCKED:** canonical mockup at `addon/design-refs/preview-final-v2.png`. Live card in Gmail matches.
-- **What's next:** **Phase 6 - Polish + Submission** (Tasks 29-39 plus inline stretches 31.5, 36.5, 36.6). Demo data → cleanup + security → docs → submission. Submission deadline Fri 2026-05-15 EOD.
+- **OIDC_AUDIENCE** (updated 2026-05-13 during Task 28 Step 4.5): `812475821064-s838lvgcgmc1nj4lbjqivpa48usi4t8v.apps.googleusercontent.com` - the Apps Script project's OAuth client ID, NOT the Cloud Run URL.
+- **Card visual is LOCKED:** canonical mockup at `addon/design-refs/preview-final-v2.png`. Live card in Gmail matches. The verdict-card BODY is now LLM-generated for SUSPICIOUS/MALICIOUS (V2.S8 prompt synthesizes multiple signals into one flowing sentence) and 4-variant templated for SAFE (V2.S12: relationship + auth, new-sender + auth, minor-findings-present, truly-clean).
+- **What's next:** **Phase 6 Task 29** (pre-seed demo Gmail's UserProperties for per-sender-baseline). Then Task 30 (craft 5 demo emails) → 31 (manual end-to-end test + screenshots) → 31.5 (cleanup + code-review) → 32 (pip-audit + security-review) → 34 (README) → 35 (CLAUDE.md refresh) → 37 (PDF cover) → 38 (submit email) → 39 (handoff). Submission deadline Fri 2026-05-15 EOD.
 
 For the full deployment-state reference (URLs, IAM, env vars, the bugs we found at deploy time, cleanup commands at end-of-project), see the `project_deploy_state.md` memory file.
 
@@ -54,6 +56,26 @@ For the full deployment-state reference (URLs, IAM, env vars, the bugs we found 
 | 27 | `9b93314` | `baseline.gs` UserProperties with LockService + ring-buffer idempotency + bounded growth on typical_* arrays |
 | 28 | (live install + iterations) | Apps Script project created on demo Gmail, OIDC audience captured + backend redeployed (Step 4.5), 8+ post-install design polish commits (`136c05b` script.locale scope, `2e1eee1` lifeguard prefix + dot regen, `c6de9e6` IconImage/CIRCLE + prettySignal, `2793119` button fallback, `abe8ea2` enum fix, `bc39d90` MITRE inline, `02e764b` inline bullet, `c58908c` drop subject/sender, `395bcf2` body indent, `7bccdba` full-title color, `e371659` logo endpoint, `5ed07c8` logo background removal) |
 
+**V2 tasks (Task 33 → 11 accepted research findings + post-deploy fixes):**
+
+| V2 task | Commit | What |
+|---|---|---|
+| V2 plan + lang bank | `a42084a` | V2 implementation plan at `docs/superpowers/plans/2026-05-13-swellscan-v2.md` + Upwind RSAC language bank at `docs/superpowers/specs/language-bank.md` |
+| V2.S1 | `ed5c3a7` | 7 new risky extensions (SVG, HTML, HTM, ISO, IMG, VHD, VHDX) - `.hta` was already in V1 |
+| V2.S2 | `eca1cc7` | LLM client defense-in-depth: hidden HTML strip, Unicode Tags strip, markdown image/ref strip, global zero-width strip; closing-tag strategy changed from zero-width-insert to `[removed]` |
+| V2.S3a | `9c0a96c` | Reply-To severity scaling (freemail=HIGH, different-corporate=MEDIUM, subdomain=no signal) - also fixes V1 over-fire on subdomain Reply-To |
+| V2.S3b | `798d8bc` | Return-Path mismatch detection wired (field was already plumbed end-to-end in V1) + 18-domain transactional-mailer allowlist |
+| V2.S4 | `80fa60a` | Password-archive correlation: encrypted archive + body password-token co-occurrence wires up dormant `ATTACHMENT_PASSWORD_PROTECTED_ARCHIVE` enum |
+| V2.S5 | `772a234` | `PAYLOAD_FRAGMENTATION_ATTEMPT` signal: 5+ short quoted tokens + assembly verb |
+| V2.S6 | `7974e37` | New detector `bec_language.py` - `PAYMENT_INSTRUCTION_URGENCY` signal: urgency word within 100 chars of payment-instruction word, OR standalone "change of banking details" phrase |
+| V2.S7 | `52585db`, `151489b` | Correlation engine: 4 attacker-playbook rules in `CORRELATION_BONUSES` (credential-harvesting trio, AI-targeted, impersonation, thread-hijack signature) |
+| V2.S8 | `40205a7`, `912f0c7`, `8422cf6` | Readable verdict summary body: LLM-generated for SUSPICIOUS/MALICIOUS (with multi-signal synthesis prompt), template for SAFE. `summary_body` field added to `LLMVerdict` Pydantic schema |
+| V2.S9 deploy | (revision `00009-v4n`) | Single deploy covering V2.S1-S8; live scan caught 3 false-positive bugs that V1 had but never surfaced |
+| V2.S10 | `2e2ca2d`, `1e630e7`, `89e06db` | Fix A: sender legitimate-subdomain handling (`accounts.google.com` was false-flagging as Google lookalike). Fix B: cousin subdomains under same registrable parent (last-2-DNS-labels heuristic; `accounts.google.com` ↔ `gaia.bounces.google.com` now same-org). Fix C: SAFE template based on verdict label, not evidence severity (SAFE-by-score with one MEDIUM-low-conf signal now correctly uses template, not V1 fallback) |
+| V2.S11 deploy | (revision `00010-nm6`) | Single deploy covering V2.S10 fixes |
+| V2.S12 | `e602dc6` | Four-variant SAFE body templates (relationship+auth-pass, new-sender+auth-pass, minor-findings, truly-clean) - replaces single static SAFE template; Option B priority (relationship wins over minor-findings when both match) |
+| V2.S13 deploy | (revision `00011-bpj`) | Single deploy covering V2.S12 |
+
 **Plan-vs-implementation drift caught (interview material):**
 
 - **Task 8** headers - planned test assumed `make_email` had a non-empty default Message-ID; fixed by adding `message_id_header` default to the fixture.
@@ -65,6 +87,17 @@ For the full deployment-state reference (URLs, IAM, env vars, the bugs we found 
 - **Task 25** SVG generator retired - Task 18's `wave.py` SVG generator was replaced with static PNG file serving for the three hero illustrations Lotan provided. Public URL contract preserved.
 - **Task 22** scopes - the `script.locale` OAuth scope was dropped on a "minimum permissions" principle. Task 28 live install proved the Gmail Add-on framework requires it at runtime even when we never call `Session.getActiveUserLocale()` directly. Scope added back.
 - **Task 28** card iterations - first install surfaced a chain of visual fixes that converged via iterative real-Gmail testing: severity dot rendering (IconImage circle-crop unreliable across runtimes; switched to coloring the title text), signal name pretty-printing, button alignment fallback (centered with FixedFooter fallback), summary opener readability, subject+sender row removal as redundant, body text alignment under the title.
+
+**V2 plan-drift catches (interview material):**
+
+- **V2.S1** risky-extension list - plan claimed 8 new extensions; `.hta` was already in V1's RISKY_EXTENSIONS, so 7 net new. Caught by reading V1 attachments.py before writing.
+- **V2.S3a/b** test fixture kwarg - plan tests used `authentication_results=` but `make_email` actually takes `auth_results=`. Renamed in tests.
+- **V2.S3b** end-to-end plumbing - plan estimated 30-60 min cross-stack work; reading V1 code revealed `EmailHeaders.return_path` field and `client.gs::parseHeaders` Return-Path extraction were already there. Backend-only ~25 min instead.
+- **V2.S4** MITRE technique - plan suggested T1027.002 (Software Packing) for password-archive correlation; correct technique is T1027.013 (Encrypted/Encoded File). Switched.
+- **V2.S7** correlation test math - plan tests used `Severity.CRITICAL` on URL_KNOWN_MALICIOUS in the credential-harvesting trio test (40 raw); plus two other HIGH signals = ~90 raw, capped at MAX_SCORE=100, swallowed the +15 bonus, made `adjusted >= raw + 15` fail. Lowered test severities, tightened assertion to `==`, added explicit cap-behavior test.
+- **V2.S8** SAFE branch trigger - originally used `all evidence INFO/LOW` to fire SAFE template. Live scan (V2.S9) caught that a SAFE-by-score email with ONE MEDIUM-low-confidence signal fell through to V1 top-evidence fallback (showed "Body contains a long base64-like string" on a SAFE card). V2.S10 fix C changed the check to compute final score + use `label_from_score()` directly.
+- **V2.S10** sender false-positive - V1 lookalike detector flagged legitimate `accounts.google.com` because `from_domain not in legit_domains` was True for ANY subdomain. V1 had this bug; never caught because V1 tests only covered typo-squat variants. Surfaced only by V2.S9 dogfooding on a real Gmail inbox.
+- **V2.S10** cousin-subdomain false-positive - V2.S3b subdomain check (`endswith("." + other)`) only caught direct subdomain relationships, not cousin subdomains under a common parent. `accounts.google.com` ↔ `gaia.bounces.google.com` were treated as cross-org mismatch. Fix: compare last-2-DNS-labels (registrable parent).
 
 ## Tech Stack & Environment
 
@@ -176,5 +209,8 @@ Update only the affected section(s). Do not rewrite the whole file. Apply the sa
 
 - `.claude/docs/architectural_patterns.md` — Deep dives on the evidence-based pattern, OIDC auth flow, prompt-injection defense layers, scoring policy
 - `docs/superpowers/specs/2026-05-12-swellscan-design.md` — The full design document. Single source of truth for every architectural and product decision. Read this first.
-- `docs/superpowers/plans/2026-05-12-swellscan-implementation.md` — The numbered implementation plan. **Treat code blocks inside it as logic-spec / pseudo-code, not source-of-truth** — see the `feedback_plan_code_is_spec_not_source.md` memory for why. The plan was written speculatively in one pass; it has at least three known bugs that surfaced during implementation (see "Plan-vs-implementation drift caught" table above).
-- Memory files at `C:\Users\lotan\.claude\projects\c--Users-lotan-Projects-Upwind\memory\` — 13 files capturing user preferences, project plan, demo strategy, **live deploy state** (`project_deploy_state.md` — URLs, GCP IDs, IAM, env vars), and Upwind research. The `MEMORY.md` index lists all of them.
+- `docs/superpowers/specs/language-bank.md` — Upwind-RSAC-aligned phrasing for README + 60-sec pitch + interview narrative. Use phrases here verbatim where they fit.
+- `docs/superpowers/plans/2026-05-12-swellscan-implementation.md` — The V1 implementation plan (Tasks 1-39). **Treat code blocks inside it as logic-spec / pseudo-code, not source-of-truth** — see the `feedback_plan_code_is_spec_not_source.md` memory for why. The plan was written speculatively in one pass; multiple bugs surfaced during execution (see "Plan-vs-implementation drift caught" table above). Tasks 36 and 36.6 in this file are superseded by V2.S7 and V2.S8.
+- `docs/superpowers/plans/2026-05-13-swellscan-v2.md` — The V2 implementation plan (research-driven enhancements V2.S1-V2.S9). **Same skepticism rule applies.** Completed and shipped via revisions `00009-v4n`, `00010-nm6`, `00011-bpj`. V2.S10-S13 are post-V2.S9 fixes documented in commits + memory.
+- `.claude/HANDOVER.md` — Canonical session brief for fresh AI sessions. Updated 2026-05-14 with V2 completion state.
+- Memory files at `C:\Users\lotan\.claude\projects\c--Users-lotan-Projects-Upwind\memory\` — captures user preferences, project plan, demo strategy, **live deploy state** (`project_deploy_state.md` — URLs, GCP IDs, IAM, env vars), Upwind research, and V2 narrative beats. The `MEMORY.md` index lists all of them.

@@ -2,6 +2,8 @@
 
 This file is the briefing for any AI session picking up Swellscan mid-implementation. The same text gets pasted into the chat when starting a fresh session for maximum first-turn compliance. The on-disk copy exists as (1) a mid-session memory refresh, (2) a starting point for short future-session prompts, and (3) project documentation.
 
+**Last updated: 2026-05-14, after V2 backend complete + 3 false-positive fixes + 4-variant SAFE bodies live. Next session opens at Task 29 (pre-seed demo UserProperties).**
+
 ---
 
 I'm continuing work on Swellscan - my home assignment for Upwind Security (a cybersecurity company I'm interviewing with). After I submit it, I will present the project live to their recruiting team in a 45-minute interview, where every architectural and product decision will be questioned. I need to be able to defend each choice myself, in my own words.
@@ -56,13 +58,19 @@ Several plan bugs have already surfaced and been documented in the plan's "Known
 ═══════════════════════════════════════════════════════════════════════
 
   1. `swellscan/CLAUDE.md` (project map at repo root)
-       → Read first. Has a "Current State" section at the top with the live Cloud Run URL, completed-task table with commit SHAs, and the "what's next" pointer. This is the single best snapshot of where we are.
+       → Read first. Updated 2026-05-14 with V2 completion state. Has the live Cloud Run revision, V1 + V2 task tables with commit SHAs, V1 + V2 plan-drift catches, the "what's next" pointer. Single best snapshot of where we are.
 
   2. `swellscan/docs/superpowers/specs/2026-05-12-swellscan-design.md`
        → The authoritative design document. Every architectural and product decision lives here. Card visual decisions are locked - the canonical visual reference is `addon/design-refs/preview-final-v2.png` and the live card now matches it.
 
   3. `swellscan/docs/superpowers/plans/2026-05-12-swellscan-implementation.md`
-       → The numbered per-task plan. Read the "Progress" section at the top to see which tasks are done (with commit SHAs) and which are next. Then READ EACH TASK YOU WORK ON WITH THE SKEPTICISM RULE ABOVE - don't paste-and-pray.
+       → The V1 implementation plan (Tasks 1-39). Read the "Progress" section at the top + the V2-decision-point note on Task 30. Apply the skepticism rule (code blocks are logic-spec, not source).
+
+  4. `swellscan/docs/superpowers/plans/2026-05-13-swellscan-v2.md`
+       → The V2 implementation plan (research-driven enhancements V2.S1-V2.S9). Completed and shipped. V2.S10-V2.S13 are post-deploy fixes documented in commits + CLAUDE.md, not in this plan file. Read the "Code-state findings" section at the top to see what V1 code state V2 was built against.
+
+  5. `swellscan/docs/superpowers/specs/language-bank.md`
+       → Upwind-RSAC-aligned phrasing for the README and the 60-second pitch. Use these phrases verbatim where they fit. Created 2026-05-13 in V2.S1.
 
 ═══════════════════════════════════════════════════════════════════════
 ## WHERE TO LOOK FOR SPECIFIC THINGS
@@ -92,7 +100,7 @@ Several plan bugs have already surfaced and been documented in the plan's "Known
 ## MEMORY FILES (particularly load-bearing right now)
 ═══════════════════════════════════════════════════════════════════════
 
-Memory directory: 15 files at `C:\Users\lotan\.claude\projects\c--Users-lotan-Projects-Upwind\memory\`. The `MEMORY.md` index lists all of them. ALL inform how you work.
+Memory directory: at `C:\Users\lotan\.claude\projects\c--Users-lotan-Projects-Upwind\memory\`. The `MEMORY.md` index lists all of them. ALL inform how you work.
 
 The ones most important to read FIRST for the upcoming work:
 
@@ -103,20 +111,22 @@ The ones most important to read FIRST for the upcoming work:
   - `feedback_announce_phase_transitions.md` - phase boundaries get explicit call-outs
   - `feedback_deliberate_creative_edge.md` - every decision needs a story that ties to a rubric item or Upwind value
   - `feedback_mobile_aware_design.md` - UI must work on desktop AND iOS/Android Gmail apps
-  - `feedback_no_em_dashes.md` - plain ASCII hyphens only in user-facing copy (added 2026-05-13)
-  - `feedback_always_full_source_deploy.md` - `gcloud run deploy --source .` for every Cloud Run change (added 2026-05-13)
-  - `project_deploy_state.md` - live URL + GCP IDs + env vars; updated 2026-05-13 with new `OIDC_AUDIENCE`
+  - `feedback_no_em_dashes.md` - plain ASCII hyphens only in user-facing copy
+  - `feedback_always_full_source_deploy.md` - `gcloud run deploy --source .` for every Cloud Run change
+  - `project_deploy_state.md` - live URL + GCP IDs + env vars; updated 2026-05-14 with new revision `00011-bpj`
+  - `project_v2_complete.md` (NEW 2026-05-14) - V2 narrative summary: what shipped, key interview beats, the "live-scan caught V1 bug" story
+  - `reference_v2_plan_drift_catches.md` (NEW 2026-05-14) - the catches in V2 that became interview material
 
 ═══════════════════════════════════════════════════════════════════════
 ## CURRENT STATE OF THE CODE
 ═══════════════════════════════════════════════════════════════════════
 
-  **Phases 0-5 complete. Tasks 1-28 of 39 done.** The Add-on is built, deployed, installed on the demo Gmail account, and verified end-to-end against a real email. The verdict card renders correctly in Gmail's right sidebar exactly as designed.
+  **V1 (Tasks 1-28 of parent plan) complete. V2 (V2.S1 - V2.S13) complete and live in production.** Next: Task 29 (pre-seed demo UserProperties) in the parent plan.
 
-  Backend status: BUILT, TESTED, DEPLOYED. **53 tests passing** (40 prior + 12 illustration + 1 logo).
+  Backend status: BUILT, TESTED, DEPLOYED at V2 state. **125 tests passing** (53 V1 baseline + 72 V2 tests).
 
     Live URL: https://swellscan-backend-102679409749.us-central1.run.app
-    Live revision: swellscan-backend-00008-gpx
+    Live revision: swellscan-backend-00011-bpj  (V2.S13 deploy, 2026-05-14)
     /health                  → {"status":"ok"}
     POST /score              → OIDC-protected (401 on bad tokens)
     /illustration/{label}    → static PNG, 1-hour cache
@@ -131,10 +141,26 @@ The ones most important to read FIRST for the upcoming work:
     - `Code.gs` - onGmailMessageOpen auto-scan trigger + 3 lifeguard-voice stub button handlers
     - `baseline.gs` - per-sender history in UserProperties with LockService + message_id idempotency
 
-  All three signature features live and tested end-to-end:
-    1. Self-defending LLM (Tasks 10 + 14): prompt-injection detector + hardened Anthropic client
-    2. Layered detection (Tasks 4 + 15): cheap detectors first, LLM only when score ≥ 25
-    3. Per-sender baseline (Tasks 17 + 27): backend detector + Add-on UserProperties writer
+  **Detectors: 8 total** (V1 had 7). New in V2: `bec_language.py` for BEC payment-instruction urgency.
+
+  **V2 additions live in production:**
+    - V2.S2 defense-in-depth LLM sanitization: hidden HTML strip, Unicode Tags block (U+E0000-U+E007F) strip, markdown image / reference-link strip, global zero-width strip, closing-tag-mimic neutralization (strategy change from V1's zero-width-insert to "[removed]" substitution)
+    - V2.S3a Reply-To severity scaling (freemail Reply-To from corporate = HIGH; different corporate = MEDIUM; subdomain = no signal - fixes V1 over-fire)
+    - V2.S3b Return-Path mismatch detection + 18-domain transactional-mailer allowlist
+    - V2.S4 Password-protected-archive correlation (wired up dormant V1 enum)
+    - V2.S5 Payload-fragmentation prompt-injection signal
+    - V2.S6 `bec_language` detector with PAYMENT_INSTRUCTION_URGENCY signal
+    - V2.S7 correlation engine: 4 attacker-playbook bonuses
+    - V2.S8 readable verdict-body: LLM-synthesized for risky verdicts (with multi-signal weave directive), templated for SAFE
+    - V2.S10 Fix A: sender legitimate-subdomain handling (V1 lookalike bug that flagged `accounts.google.com` as Google lookalike)
+    - V2.S10 Fix B: cousin-subdomain handling for Reply-To / Return-Path (last-2-DNS-labels heuristic for registrable parent)
+    - V2.S10 Fix C: SAFE body uses verdict label, not evidence severity
+    - V2.S12 four-variant SAFE body templates (relationship+auth, new-sender+auth, minor-findings, truly-clean)
+
+  All three signature features live and verified at V2 state:
+    1. Self-defending LLM (V1 + V2.S2 defense-in-depth additions)
+    2. Layered detection with correlation engine (V1 + V2.S7 bonuses)
+    3. Per-sender baseline (V1 + V2.S6 thread-hijack cheap-version signal)
 
   GCP project: swellscan-prod (102679409749)
   Owner: swellscan.demo@gmail.com (also the demo Gmail account)
@@ -168,7 +194,7 @@ Key locked decisions:
 
 This is the FINAL phase before the home assignment ships. Submission is Fri 2026-05-15 EOD.
 
-Phase 6 has 11 numbered items (Tasks 29-39 plus inline stretches 31.5, 36.5, 36.6). They group into four chunks:
+Phase 6 has 10 active items now (Tasks 29-39 minus the original stretches, since V2 already absorbed Task 33 + Task 36 + Task 36.6). They group into four chunks:
 
 | Chunk | Tasks | Why |
 |---|---|---|
@@ -177,13 +203,26 @@ Phase 6 has 11 numbered items (Tasks 29-39 plus inline stretches 31.5, 36.5, 36.
 | **Documentation** | 34 (README) → 35 (CLAUDE.md refresh) → 37 (PDF cover sheet) | README is graded. PDF is what reaches the recruiter. |
 | **Submission** | 38 (email + repo + PDF) → 39 (handoff) | The button-press moment. |
 
-Recommended sequence: 29 → 30 → 31 first (real testing while bugs are still fixable). Then 31.5 + 32. Then 34 + 35 (docs). Stretches in any gaps. 37 + 38 last.
+Recommended sequence: 29 → 30 → 31 first (real testing while bugs are still fixable). Then 31.5 + 32. Then 34 + 35 (docs). 37 + 38 last.
 
-**Active stretches (only if time, never block submission):**
-- Task 33: threat-research scan (90-min internet sweep for missed attack vectors)
-- Task 36: correlation engine (signal-set bonuses in scoring policy)
-- Task 36.5: wire the three action-button handlers from stubs to real actions
-- Task 36.6: rewrite the verdict summary body for better readability
+**Tasks already absorbed by V2 (do NOT redo):**
+- Task 33 (threat-research scan) - V2 executed this; output is the 11 accepted findings shipped V2.S1-V2.S8
+- Task 36 (correlation engine) - V2.S7 supersedes
+- Task 36.6 (verdict summary body) - V2.S8 supersedes
+
+**Active stretch (only if time, post-submission):**
+- Task 40 (NEW, was Task 36.5): Gandalf-style adversarial playground - public endpoint where the interviewer can try to jailbreak the LLM live in the demo call. Skip unless margin remains after Task 38 submission.
+
+═══════════════════════════════════════════════════════════════════════
+## DECISION POINT BAKED INTO TASK 30
+═══════════════════════════════════════════════════════════════════════
+
+The V2.S6 BEC-language detector emits `PAYMENT_INSTRUCTION_URGENCY` but none of the 5 planned demo emails currently trigger it. Decide at Task 30 execution time:
+- **Option A (recommended):** rework demo #2 (Microsoft phishing) to include payment-urgency language so V2.S6 fires on a demo card
+- **Option B:** add a 6th BEC demo email
+- **Option C:** keep planned 5; V2.S6 stays an architecture talking point without live-demo example
+
+Note added to parent plan's Task 30 spec on 2026-05-13.
 
 ═══════════════════════════════════════════════════════════════════════
 ## IMMEDIATE NEXT ACTION
