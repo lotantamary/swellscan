@@ -37,6 +37,29 @@ def test_v2_summarize_safe_uses_template():
     assert summary == "Authentication and sender check out, no suspicious content detected."
 
 
+def test_v2_safe_template_fires_when_one_medium_signal_keeps_score_below_threshold():
+    """V2.S10 fix C: SAFE label + one low-confidence MEDIUM signal still uses
+    the SAFE template (not the V1 top-evidence fallback).
+
+    Example from V2.S9 live scan: marketing email with base64-encoded tracking
+    pixel fired ENCODED_PAYLOAD_IN_BODY (MEDIUM, conf 0.6 = ~6 raw) but the
+    verdict was correctly SAFE.
+    """
+    evidence = [
+        Evidence(
+            signal=Signal.ENCODED_PAYLOAD_IN_BODY,
+            severity=Severity.MEDIUM,
+            confidence=0.6,
+            explanation="Body contains a long base64-like string - may be an encoded payload.",
+            mitre_techniques=["T1027"],
+            details={},
+            detector="prompt_injection",
+        ),
+    ]
+    summary = Pipeline._summarize(evidence)
+    assert summary == "Authentication and sender check out, no suspicious content detected."
+
+
 def test_v2_summarize_uses_llm_summary_body_when_present():
     """When any evidence carries llm_summary_body in details, that wins."""
     llm_body = (

@@ -15,7 +15,12 @@ from backend.detectors.urls import UrlsDetector
 from backend.models.email import Email
 from backend.models.evidence import Evidence
 from backend.models.verdict import Verdict
-from backend.scoring.aggregator import build_verdict, compute_raw_score
+from backend.scoring.aggregator import (
+    apply_correlation_bonuses,
+    build_verdict,
+    compute_raw_score,
+    label_from_score,
+)
 from backend.scoring.policy import LLM_INVOCATION_THRESHOLD
 
 log = structlog.get_logger()
@@ -74,13 +79,17 @@ class Pipeline:
 
     @staticmethod
     def _summarize(evidence: list[Evidence]) -> str:
-        """V2.S8 body builder.
+        """V2.S8 body builder, V2.S10-fix-C label check.
 
         Preference order:
           1. LLM-written body if any evidence has 'llm_summary_body' in details.
-          2. Templated body for the SAFE case (all evidence INFO/LOW).
+          2. SAFE template when the final verdict label would be SAFE. We
+             check the actual label (computed from raw + correlation bonuses)
+             rather than evidence severity, because a SAFE-by-score email can
+             still carry one MEDIUM signal at low confidence without breaking
+             the SAFE label.
           3. Fallback to the top evidence's explanation (preserves V1 behavior
-             when the LLM didn't run but a risky signal still fired).
+             for SUSPICIOUS / MALICIOUS verdicts when the LLM didn't fire).
         """
         if not evidence:
             return "No suspicious signals detected."
@@ -90,7 +99,10 @@ class Pipeline:
             if isinstance(body, str) and body.strip():
                 return body.strip()
 
-        if all(_SEVERITY_RANK[ev.severity] <= 1 for ev in evidence):
+        final_score = apply_correlation_bonuses(
+            evidence, compute_raw_score(evidence)
+        )
+        if label_from_score(final_score) == "SAFE":
             return "Authentication and sender check out, no suspicious content detected."
 
         top = sorted(
