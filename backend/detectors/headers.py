@@ -12,6 +12,21 @@ DKIM_PATTERN = re.compile(
 )
 DMARC_PATTERN = re.compile(r"dmarc=(pass|fail|bestguesspass|none)", re.I)
 
+# V2.S10 fix B: registrable-parent extraction. Cousin subdomains under a
+# common parent (e.g. accounts.google.com vs gaia.bounces.google.com) belong
+# to the same org and should not trigger Reply-To / Return-Path mismatch
+# signals. Simple last-2-labels heuristic; would need the Public Suffix List
+# to handle .co.uk-style multi-label TLDs precisely. The PSL gap produces
+# false-negatives (missing a real mismatch) rather than false-positives, so
+# acceptable for our scope.
+def _registrable_parent(domain: str) -> str:
+    """Return the last two DNS labels of a domain, joined with a dot."""
+    if not domain:
+        return ""
+    parts = domain.rsplit(".", 2)
+    return ".".join(parts[-2:])
+
+
 # V2.S3a: known freemail domains. Corporate-From + freemail-Reply-To = strong
 # BEC indicator. TODO (future cleanup): consolidate with FREEMAIL set in
 # sender.py into a shared constants module.
@@ -128,11 +143,14 @@ class HeadersDetector(Detector):
                 .strip()
             )
             domains_differ = bool(reply_domain) and reply_domain != from_domain
-            is_subdomain = bool(reply_domain) and (
-                reply_domain.endswith("." + from_domain)
-                or from_domain.endswith("." + reply_domain)
+            # V2.S10 fix B: cousin subdomains under the same registrable
+            # parent (e.g. accounts.google.com / feedback.google.com) are
+            # same-org and should not fire.
+            same_parent = bool(reply_domain) and (
+                _registrable_parent(reply_domain)
+                == _registrable_parent(from_domain)
             )
-            if domains_differ and not is_subdomain:
+            if domains_differ and not same_parent:
                 if (
                     reply_domain in FREEMAIL_DOMAINS
                     and from_domain not in FREEMAIL_DOMAINS
@@ -176,12 +194,14 @@ class HeadersDetector(Detector):
             )
             from_domain = email.from_.address.split("@", 1)[-1].lower()
             domains_differ = bool(rp_domain) and rp_domain != from_domain
-            is_subdomain = bool(rp_domain) and (
-                rp_domain.endswith("." + from_domain)
-                or from_domain.endswith("." + rp_domain)
+            # V2.S10 fix B: cousin subdomains under the same registrable
+            # parent are same-org (e.g. accounts.google.com / gaia.bounces.google.com).
+            same_parent = bool(rp_domain) and (
+                _registrable_parent(rp_domain)
+                == _registrable_parent(from_domain)
             )
             is_transactional = rp_domain in TRANSACTIONAL_MAILER_DOMAINS
-            if domains_differ and not is_subdomain and not is_transactional:
+            if domains_differ and not same_parent and not is_transactional:
                 if (
                     rp_domain in FREEMAIL_DOMAINS
                     and from_domain not in FREEMAIL_DOMAINS

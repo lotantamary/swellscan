@@ -188,3 +188,59 @@ async def test_v2_return_path_empty_no_signal():
     evs = await HeadersDetector().run(email)
     rp = [e for e in evs if e.signal == Signal.RETURN_PATH_DOMAIN_MISMATCH]
     assert len(rp) == 0
+
+
+# V2.S10 fix B: cousin subdomains under a common registrable parent should
+# not fire mismatch signals (e.g. accounts.google.com vs gaia.bounces.google.com).
+
+
+@pytest.mark.asyncio
+async def test_v2_return_path_cousin_subdomain_same_parent_no_signal():
+    """V2.S10 fix B: accounts.google.com vs gaia.bounces.google.com = same org, no signal."""
+    email = make_email(
+        from_address="noreply@accounts.google.com",
+        return_path="<bounce@gaia.bounces.google.com>",
+        auth_results="spf=pass; dkim=pass; dmarc=pass",
+    )
+    evs = await HeadersDetector().run(email)
+    rp = [e for e in evs if e.signal == Signal.RETURN_PATH_DOMAIN_MISMATCH]
+    assert len(rp) == 0
+
+
+@pytest.mark.asyncio
+async def test_v2_reply_to_cousin_subdomain_same_parent_no_signal():
+    """V2.S10 fix B: same logic applied to Reply-To check."""
+    email = make_email(
+        from_address="noreply@accounts.google.com",
+        reply_to="support@feedback.google.com",
+        auth_results="spf=pass; dkim=pass; dmarc=pass",
+    )
+    evs = await HeadersDetector().run(email)
+    rep = [e for e in evs if e.signal == Signal.REPLY_TO_DOMAIN_MISMATCH]
+    assert len(rep) == 0
+
+
+@pytest.mark.asyncio
+async def test_v2_return_path_different_parents_still_fires():
+    """Regression guard: genuinely different orgs still fire."""
+    email = make_email(
+        from_address="contact@realcompany.com",
+        return_path="<bounce@otherorg.example>",
+        auth_results="spf=pass; dkim=pass; dmarc=pass",
+    )
+    evs = await HeadersDetector().run(email)
+    rp = [e for e in evs if e.signal == Signal.RETURN_PATH_DOMAIN_MISMATCH]
+    assert len(rp) == 1
+
+
+@pytest.mark.asyncio
+async def test_v2_reply_to_different_parents_still_fires():
+    """Regression guard: Reply-To across different parents still fires."""
+    email = make_email(
+        from_address="ceo@corporate.com",
+        reply_to="ceo.alt@another-org.com",
+        auth_results="spf=pass; dkim=pass; dmarc=pass",
+    )
+    evs = await HeadersDetector().run(email)
+    rep = [e for e in evs if e.signal == Signal.REPLY_TO_DOMAIN_MISMATCH]
+    assert len(rep) == 1
