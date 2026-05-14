@@ -13,7 +13,10 @@ log = structlog.get_logger()
 class LLMVerdict(BaseModel):
     verdict: str = Field(pattern=r"^(benign|suspicious|malicious)$")
     confidence: float = Field(ge=0.0, le=1.0)
-    reasoning: str = Field(max_length=500)
+    # Task 31 fix: was 500. Claude returns 500-1500 char reasoning on
+    # multi-signal phishing emails. Rejecting those means losing the
+    # entire LLM contribution to the verdict.
+    reasoning: str = Field(max_length=2000)
     matched_patterns: list[str] = Field(default_factory=list, max_length=10)
     should_warn_user: bool
     # V2.S8: one-sentence plain-language body shown directly on the verdict
@@ -78,9 +81,38 @@ def _sanitize_body(body: str) -> str:
     return body
 
 
+def _strip_code_fences(text: str) -> str:
+    """Task 31 fix: Claude frequently wraps JSON output in markdown
+    ```json ... ``` fences even when the system prompt asks for raw
+    JSON. Pydantic's model_validate_json then fails with a
+    json_invalid error and the LLM contribution is silently lost.
+    Caught via Cloud Run logs during Task 31 Phase A demo 2 debugging.
+
+    Strip the fences defensively. Handles three forms:
+      ```json\n{...}\n```
+      ```\n{...}\n```
+      {...}    (untouched)
+    """
+    text = text.strip()
+    if text.startswith("```"):
+        first_newline = text.find("\n")
+        if first_newline != -1:
+            text = text[first_newline + 1:]
+        if text.endswith("```"):
+            text = text[:-3].rstrip()
+    return text
+
+
 class AnthropicClient:
     MODEL = "claude-sonnet-4-6"
-    TIMEOUT_S = 5.0
+    # Task 31 fix: was 5.0. Live diagnosis via Cloud Run logs showed every
+    # LLM call silently failing with httpx "Connection error" - actually a
+    # timeout, because Anthropic API responses for our ~11KB prompts run
+    # 5-15s typically. 30s gives realistic headroom while still well under
+    # Cloud Run's 60s request ceiling. The card was misleadingly showing
+    # "LLM consulted" because pipeline.append('llm') ran inside the
+    # try-block even when the call returned None - fixed in pipeline.py.
+    TIMEOUT_S = 30.0
 
     def __init__(self, client: AsyncAnthropic | None = None):
         self._anth = client or AsyncAnthropic(
@@ -142,7 +174,23 @@ class AnthropicClient:
                 messages=[{"role": "user", "content": user}],
             )
             text = resp.content[0].text if resp.content else ""
-            return LLMVerdict.model_validate_json(text)
+            text = _strip_code_fences(text)
+            verdict = LLMVerdict.model_validate_json(text)
+            log.info(
+                "llm_call_succeeded",
+                model=self.MODEL,
+                verdict=verdict.verdict,
+                confidence=verdict.confidence,
+            )
+            return verdict
         except Exception as exc:
-            log.warning("llm_call_failed", error=str(exc))
+            # Task 31 fix: include exception class name so future debug
+            # sessions can distinguish timeout vs HTTP vs validation
+            # errors at a glance. Bare str(exc) for httpx connection
+            # errors is just "Connection error." with no hint at root cause.
+            log.warning(
+                "llm_call_failed",
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
             return None

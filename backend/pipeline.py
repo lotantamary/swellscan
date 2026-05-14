@@ -93,8 +93,19 @@ class Pipeline:
         if raw >= LLM_INVOCATION_THRESHOLD:
             try:
                 llm_ev = await self._llm.run_with_evidence(email, evidence)
-                evidence.extend(llm_ev)
-                detectors_run.append(self._llm.name)
+                # Task 31 fix: only count LLM as "consulted" when it
+                # actually contributed evidence. The old code appended
+                # 'llm' to detectors_run unconditionally on a successful
+                # call, including when the call returned None (e.g.
+                # timed out) and run_with_evidence returned []. That
+                # made the card's "LLM consulted" meta-line lie: it
+                # showed True even when the LLM had silently failed.
+                # Diagnosed during Task 31 Phase A demo 2 scan when the
+                # Anthropic dashboard showed zero balance consumed
+                # despite every card claiming "LLM consulted".
+                if llm_ev:
+                    evidence.extend(llm_ev)
+                    detectors_run.append(self._llm.name)
             except Exception as exc:
                 log.warning("llm_skipped", error=str(exc))
 

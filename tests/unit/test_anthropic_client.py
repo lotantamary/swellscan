@@ -5,7 +5,7 @@ Each layer of `_sanitize_body` has a focused test. The cross-detector invariant
 test_prompt_injection.py::test_zero_width_chars_detected.
 """
 
-from backend.clients.anthropic import _sanitize_body
+from backend.clients.anthropic import _sanitize_body, _strip_code_fences
 
 
 def test_sanitize_strips_zero_width_chars_globally():
@@ -73,3 +73,27 @@ def test_sanitize_preserves_legitimate_text():
     body = "Hi team, please review the doc and confirm by EOD. Thanks!"
     sanitized = _sanitize_body(body)
     assert sanitized == body
+
+
+def test_strip_code_fences_json_labeled():
+    """Task 31 fix: Claude wraps JSON in ```json ... ``` fences."""
+    raw = '```json\n{"verdict":"malicious","confidence":0.95}\n```'
+    assert _strip_code_fences(raw) == '{"verdict":"malicious","confidence":0.95}'
+
+
+def test_strip_code_fences_unlabeled():
+    """Task 31 fix: also handle bare ``` fences without language tag."""
+    raw = '```\n{"verdict":"benign"}\n```'
+    assert _strip_code_fences(raw) == '{"verdict":"benign"}'
+
+
+def test_strip_code_fences_no_op_when_unfenced():
+    """Task 31 fix: raw JSON (no fences) must pass through unchanged."""
+    raw = '{"verdict":"suspicious","confidence":0.6}'
+    assert _strip_code_fences(raw) == raw
+
+
+def test_strip_code_fences_handles_leading_whitespace():
+    """Task 31 fix: tolerate whitespace before the opening fence."""
+    raw = '   \n\n```json\n{"verdict":"malicious"}\n```\n  '
+    assert _strip_code_fences(raw) == '{"verdict":"malicious"}'

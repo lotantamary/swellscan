@@ -63,7 +63,12 @@ class Evidence(BaseModel):
     signal: Signal
     severity: Severity
     confidence: float = Field(ge=0.0, le=1.0)
-    explanation: str = Field(max_length=400)
+    # Task 31 fix: was 400. LLM-emitted Evidence carried the model's
+    # `reasoning` text which can run 500-1500 chars on multi-signal
+    # emails. The card truncates to 200 chars for display anyway via
+    # `truncate(e.explanation, 200)` in addon/render.gs, so the storage
+    # cap was costing us LLM contributions without protecting anything.
+    explanation: str = Field(max_length=2000)
     mitre_techniques: list[str] = Field(default_factory=list)
     details: dict[str, Any] = Field(default_factory=dict)
     detector: str = Field(max_length=50)
