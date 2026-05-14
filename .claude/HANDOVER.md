@@ -113,7 +113,7 @@ The ones most important to read FIRST for the upcoming work:
   - `feedback_mobile_aware_design.md` - UI must work on desktop AND iOS/Android Gmail apps
   - `feedback_no_em_dashes.md` - plain ASCII hyphens only in user-facing copy
   - `feedback_always_full_source_deploy.md` - `gcloud run deploy --source .` for every Cloud Run change
-  - `project_deploy_state.md` - live URL + GCP IDs + env vars; updated 2026-05-14 with new revision `00011-bpj`
+  - `project_deploy_state.md` - live URL + GCP IDs + env vars; updated 2026-05-14 with current revision `00012-nhf` + V2.S14 (multi-audience OIDC + per-user rate limiter + max-instances=10 + Anthropic cost-protection prerequisites)
   - `project_v2_complete.md` (NEW 2026-05-14) - V2 narrative summary: what shipped, key interview beats, the "live-scan caught V1 bug" story
   - `reference_v2_plan_drift_catches.md` (NEW 2026-05-14) - the catches in V2 that became interview material
 
