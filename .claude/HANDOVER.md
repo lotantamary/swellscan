@@ -2,7 +2,7 @@
 
 This file is the briefing for any AI session picking up Swellscan mid-implementation. The same text gets pasted into the chat when starting a fresh session for maximum first-turn compliance. The on-disk copy exists as (1) a mid-session memory refresh, (2) a starting point for short future-session prompts, and (3) project documentation.
 
-**Last updated: 2026-05-14, after V2 backend complete + 3 false-positive fixes + 4-variant SAFE bodies live. Next session opens at Task 29 (pre-seed demo UserProperties).**
+**Last updated: 2026-05-14, after V2 backend complete + 3 false-positive fixes + 4-variant SAFE bodies + V2.S14 multi-audience OIDC + per-user rate limiter live. Next session opens at Task 29 (pre-seed demo UserProperties).**
 
 ---
 
@@ -121,12 +121,12 @@ The ones most important to read FIRST for the upcoming work:
 ## CURRENT STATE OF THE CODE
 ═══════════════════════════════════════════════════════════════════════
 
-  **V1 (Tasks 1-28 of parent plan) complete. V2 (V2.S1 - V2.S13) complete and live in production.** Next: Task 29 (pre-seed demo UserProperties) in the parent plan.
+  **V1 (Tasks 1-28 of parent plan) complete. V2 (V2.S1 - V2.S14) complete and live in production.** Next: Task 29 (pre-seed demo UserProperties) in the parent plan.
 
-  Backend status: BUILT, TESTED, DEPLOYED at V2 state. **125 tests passing** (53 V1 baseline + 72 V2 tests).
+  Backend status: BUILT, TESTED, DEPLOYED at V2 state. **136 tests passing** (53 V1 baseline + 83 V2 tests).
 
     Live URL: https://swellscan-backend-102679409749.us-central1.run.app
-    Live revision: swellscan-backend-00011-bpj  (V2.S13 deploy, 2026-05-14)
+    Live revision: swellscan-backend-00012-nhf  (V2.S14 deploy, 2026-05-14)
     /health                  → {"status":"ok"}
     POST /score              → OIDC-protected (401 on bad tokens)
     /illustration/{label}    → static PNG, 1-hour cache
@@ -156,6 +156,7 @@ The ones most important to read FIRST for the upcoming work:
     - V2.S10 Fix B: cousin-subdomain handling for Reply-To / Return-Path (last-2-DNS-labels heuristic for registrable parent)
     - V2.S10 Fix C: SAFE body uses verdict label, not evidence severity
     - V2.S12 four-variant SAFE body templates (relationship+auth, new-sender+auth, minor-findings, truly-clean)
+    - V2.S14 multi-audience OIDC support (`OIDC_AUDIENCE` env var is now comma-separated; unblocks "Path A" install for other Apps Script projects sharing this backend) + per-user rate limiter (`backend/rate_limit.py`, 100 calls / 24h sliding window, in-memory approximate, wired into `verify_request`) + Cloud Run `--max-instances=10` flag
 
   All three signature features live and verified at V2 state:
     1. Self-defending LLM (V1 + V2.S2 defense-in-depth additions)
@@ -214,6 +215,18 @@ Recommended sequence: 29 → 30 → 31 first (real testing while bugs are still 
 - Task 40 (NEW, was Task 36.5): Gandalf-style adversarial playground - public endpoint where the interviewer can try to jailbreak the LLM live in the demo call. Skip unless margin remains after Task 38 submission.
 
 ═══════════════════════════════════════════════════════════════════════
+## COST PROTECTION (manual prerequisites SET 2026-05-14)
+═══════════════════════════════════════════════════════════════════════
+
+Three layers of defense-in-depth for backend costs:
+
+1. **Anthropic prepaid balance: $5** - the actual hard cap. API stops accepting calls when balance hits zero. Cannot be charged more than what's prepaid.
+2. **Anthropic monthly spend limit: $20** - safety net for IF a payment method is ever added later.
+3. **Per-user rate limit: 100 calls / 24h** (V2.S14) + **max-instances=10** + **ALLOWED_USERS allowlist**.
+
+Estimated per-scan cost: ~$0.01 when LLM fires. The $5 balance covers ~500 LLM-firing scans. Plenty for the demo + a few authorized testers.
+
+═══════════════════════════════════════════════════════════════════════
 ## DECISION POINT BAKED INTO TASK 30
 ═══════════════════════════════════════════════════════════════════════
 
@@ -223,6 +236,27 @@ The V2.S6 BEC-language detector emits `PAYMENT_INSTRUCTION_URGENCY` but none of 
 - **Option C:** keep planned 5; V2.S6 stays an architecture talking point without live-demo example
 
 Note added to parent plan's Task 30 spec on 2026-05-13.
+
+═══════════════════════════════════════════════════════════════════════
+## REMEMBER FOR TASK 34 (README) - things discovered this session
+═══════════════════════════════════════════════════════════════════════
+
+These came up during V2.S10-V2.S14 and need to land in the README. They are NOT yet in the parent plan's Task 34 spec; the new session must remember them when writing the README:
+
+**Install section: document both paths.**
+- **Path A: Use shared backend (V2.S14 enables this).** Authorized user emails Lotan with their Gmail address + their Apps Script project's OAuth client ID. Lotan adds them to `ALLOWED_USERS` + `OIDC_AUDIENCE` env vars and re-deploys. ~15 min total including email round-trip.
+- **Path B: Self-host backend.** Clone repo, set up own GCP project + billing + 3 API keys in Secret Manager + deploy Cloud Run. 1-2h depending on GCP familiarity.
+- **Path C: Marketplace publication** (Future Work) - production-grade install via Google Workspace Marketplace after CASA security assessment.
+
+**Future Work additions (beyond the 13 from the original research scan):**
+- **Button-wired feedback loop + sender reputation memory** (combines deferred Task 36.5 button wiring with the prior-verdict-storage idea). User clicks a card button; sender reputation updates; future scans use the user-confirmed reputation as info-only signal. Avoids false-positive amplification by being user-driven.
+- **Google Workspace Marketplace publication** as production-grade Path C.
+- **Memorystore/Redis-backed exact rate limiting** - current V2.S14 limiter is in-memory approximate.
+
+**Limitations additions:**
+- Sender baseline tracks behavior (signing domains, IP prefixes, send hours), NOT reputation memory. A sender flagged MALICIOUS once will not be auto-distrusted on a later clean email. The button-feedback-loop Future Work item is the named upgrade path.
+- Add-on requires test-deployment install (Apps Script copy-paste) until Marketplace publication.
+- PSL gap on registrable-parent extraction: `.co.uk`-style cousin subdomains are treated as same-org. False-negative direction (missing a real mismatch), not false-positive. Acceptable trade-off vs adding the Public Suffix List as a dependency.
 
 ═══════════════════════════════════════════════════════════════════════
 ## IMMEDIATE NEXT ACTION

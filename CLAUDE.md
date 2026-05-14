@@ -9,8 +9,8 @@ The design deliberately mirrors Upwind's own published architecture (RSAC 2026 m
 **V1 (Tasks 1-28 of parent plan) complete. V2 (V2.S1 - V2.S13, all 11 accepted research findings + 3 false-positive fixes + 4-variant SAFE body) complete and deployed.** Phase 6 starts at Task 29 (pre-seed demo UserProperties).
 
 - **Live URL:** [`https://swellscan-backend-102679409749.us-central1.run.app`](https://swellscan-backend-102679409749.us-central1.run.app/health) - `/health` returns `{"status":"ok"}`, `/score` is OIDC-protected (401 without a valid Google ID token), `/illustration/{label}` serves the static hero PNG (SAFE/SUSPICIOUS/MALICIOUS), `/dot/{severity}` serves the severity-dot icon, `/logo.png` serves the Swellscan brand logo. All static endpoints carry a 1-hour cache.
-- **Live revision:** `swellscan-backend-00011-bpj` (V2.S13 deploy).
-- **Tests:** **125 passing** (53 V1 baseline + 72 V2 tests). `pytest` from repo root runs all.
+- **Live revision:** `swellscan-backend-00012-nhf` (V2.S14 deploy: multi-audience OIDC + per-user rate limiter + max-instances=10).
+- **Tests:** **136 passing** (53 V1 baseline + 83 V2 tests). `pytest` from repo root runs all.
 - **Detectors (8 total, was 7 in V1):** headers, sender, urls, attachments, prompt-injection, sender-baseline, llm, **plus new V2 detector `bec_language`** (payment-instruction-urgency BEC defense).
 - **New signals in V2 (3):** `PAYLOAD_FRAGMENTATION_ATTEMPT` (prompt-injection), `PAYMENT_INSTRUCTION_URGENCY` (bec_language), `RETURN_PATH_DOMAIN_MISMATCH` (headers). Also wired up the previously-dormant `ATTACHMENT_PASSWORD_PROTECTED_ARCHIVE` enum to a real detection rule.
 - **Three signature features built and verified end-to-end:**
@@ -75,6 +75,7 @@ For the full deployment-state reference (URLs, IAM, env vars, the bugs we found 
 | V2.S11 deploy | (revision `00010-nm6`) | Single deploy covering V2.S10 fixes |
 | V2.S12 | `e602dc6` | Four-variant SAFE body templates (relationship+auth-pass, new-sender+auth-pass, minor-findings, truly-clean) - replaces single static SAFE template; Option B priority (relationship wins over minor-findings when both match) |
 | V2.S13 deploy | (revision `00011-bpj`) | Single deploy covering V2.S12 |
+| V2.S14 | `cd8a79a` | Multi-audience OIDC support (`OIDC_AUDIENCE` env var now comma-separated) + per-user rate limiter (100 calls / 24h sliding window via `backend/rate_limit.py`, in-memory approximate, wired into `verify_request` after the allowlist check) + Cloud Run `--max-instances=10` flag. Unblocks Path A install in README (other Apps Script projects can share this backend). Defense-in-depth combo: Anthropic prepaid $5 balance (hard cap) + monthly limit $20 + per-user rate limit + max-instances. Live revision `00012-nhf`. |
 
 **Plan-vs-implementation drift caught (interview material):**
 
@@ -126,7 +127,8 @@ For the full deployment-state reference (URLs, IAM, env vars, the bugs we found 
 | `backend/scoring/` | `policy.py` holds weights, thresholds, and correlation bonuses; `aggregator.py` is a pure `list[Evidence] → Verdict` |
 | `backend/clients/` | Thin wrappers around external APIs — `anthropic.py`, `virustotal.py`, `safebrowsing.py`, `urlscan.py` |
 | `backend/illustration/` | `wave.py` generates the per-verdict SVG hero image served to the Add-on |
-| `backend/auth.py` | OIDC ID-token verification via Google JWKs + email allowlist check |
+| `backend/auth.py` | OIDC ID-token verification via Google JWKs + email allowlist check + V2.S14 per-user rate-limit gate |
+| `backend/rate_limit.py` | V2.S14 in-memory sliding-window per-user rate limiter (100 calls / 24h). Called from `verify_request`. |
 | `backend/pipeline.py` | Orchestrator: parallel detector dispatch → aggregator → conditional LLM → final verdict |
 | `addon/Code.gs` | `onGmailMessageOpen` trigger; card-state routing |
 | `addon/baseline.gs` | Sender-history read/update with `LockService` + `message_id` idempotency |
