@@ -27,37 +27,83 @@ def _ev(
     )
 
 
-def test_v2_summarize_safe_uses_template():
-    """SAFE case (all INFO/LOW) yields the templated lean sentence."""
+def test_v2_safe_variant_known_sender_with_auth():
+    """V2.S12 Variant 1: auth-pass + known sender + no drift = 'matches the pattern'."""
     evidence = [
         _ev(Signal.SPF_PASS, Severity.INFO, "SPF passed."),
         _ev(Signal.DKIM_VALID, Severity.INFO, "DKIM signature valid."),
     ]
-    summary = Pipeline._summarize(evidence)
-    assert summary == "Authentication and sender check out, no suspicious content detected."
+    assert (
+        Pipeline._summarize(evidence)
+        == "This sender matches the pattern you've seen from them before."
+    )
 
 
-def test_v2_safe_template_fires_when_one_medium_signal_keeps_score_below_threshold():
-    """V2.S10 fix C: SAFE label + one low-confidence MEDIUM signal still uses
-    the SAFE template (not the V1 top-evidence fallback).
+def test_v2_safe_variant_new_sender_with_auth():
+    """V2.S12 Variant 2: auth-pass + FIRST_SEEN_SENDER = 'first email...identity checks out'."""
+    evidence = [
+        _ev(Signal.SPF_PASS, Severity.INFO, "SPF passed."),
+        _ev(Signal.DKIM_VALID, Severity.INFO, "DKIM signature valid."),
+        _ev(Signal.FIRST_SEEN_SENDER, Severity.LOW, "First time seeing this sender."),
+    ]
+    assert (
+        Pipeline._summarize(evidence)
+        == "This is the first email you've received from this sender, "
+        "and their identity checks out."
+    )
 
-    Example from V2.S9 live scan: marketing email with base64-encoded tracking
-    pixel fired ENCODED_PAYLOAD_IN_BODY (MEDIUM, conf 0.6 = ~6 raw) but the
-    verdict was correctly SAFE.
-    """
+
+def test_v2_safe_variant_findings_exist():
+    """V2.S12 Variant 3: SAFE label + MEDIUM finding fired + no auth signals = 'minor things turned up'."""
     evidence = [
         Evidence(
             signal=Signal.ENCODED_PAYLOAD_IN_BODY,
             severity=Severity.MEDIUM,
             confidence=0.6,
-            explanation="Body contains a long base64-like string - may be an encoded payload.",
+            explanation="Body contains a long base64-like string.",
             mitre_techniques=["T1027"],
             details={},
             detector="prompt_injection",
         ),
     ]
-    summary = Pipeline._summarize(evidence)
-    assert summary == "Authentication and sender check out, no suspicious content detected."
+    assert (
+        Pipeline._summarize(evidence)
+        == "Some minor things turned up but nothing concerning."
+    )
+
+
+def test_v2_safe_variant_truly_clean():
+    """V2.S12 Variant 4: SAFE label, no MEDIUM+ findings, no auth-pass match = 'nothing stood out'."""
+    evidence = [
+        _ev(Signal.SPF_PASS, Severity.INFO, "SPF passed."),
+        # DKIM_VALID missing -> Variant 1 doesn't apply
+    ]
+    assert (
+        Pipeline._summarize(evidence)
+        == "Nothing in this email stood out as suspicious."
+    )
+
+
+def test_v2_safe_option_b_priority_relationship_wins_over_findings():
+    """V2.S12 Option B: when auth+known-sender match AND minor findings exist,
+    Variant 1 (relationship) takes priority over Variant 3 (findings)."""
+    evidence = [
+        _ev(Signal.SPF_PASS, Severity.INFO, "SPF passed."),
+        _ev(Signal.DKIM_VALID, Severity.INFO, "DKIM signature valid."),
+        Evidence(
+            signal=Signal.ENCODED_PAYLOAD_IN_BODY,
+            severity=Severity.MEDIUM,
+            confidence=0.6,
+            explanation="base64-like string.",
+            mitre_techniques=["T1027"],
+            details={},
+            detector="prompt_injection",
+        ),
+    ]
+    assert (
+        Pipeline._summarize(evidence)
+        == "This sender matches the pattern you've seen from them before."
+    )
 
 
 def test_v2_summarize_uses_llm_summary_body_when_present():
@@ -114,5 +160,5 @@ def test_v2_summarize_empty_llm_body_is_ignored():
         ),
     ]
     summary = Pipeline._summarize(evidence)
-    # INFO-only -> SAFE template applies
-    assert summary == "Authentication and sender check out, no suspicious content detected."
+    # INFO-only with no SPF/DKIM -> Variant 4 fires
+    assert summary == "Nothing in this email stood out as suspicious."

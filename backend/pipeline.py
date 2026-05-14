@@ -13,7 +13,7 @@ from backend.detectors.sender import SenderDetector
 from backend.detectors.sender_baseline import SenderBaselineDetector
 from backend.detectors.urls import UrlsDetector
 from backend.models.email import Email
-from backend.models.evidence import Evidence
+from backend.models.evidence import Evidence, Severity, Signal
 from backend.models.verdict import Verdict
 from backend.scoring.aggregator import (
     apply_correlation_bonuses,
@@ -32,6 +32,35 @@ _SEVERITY_RANK = {
     "low": 1,
     "info": 0,
 }
+
+# V2.S12: SAFE-state body variants. Picked in priority order; first match wins.
+# Option B: relationship-and-auth wins over "minor findings" when both match,
+# because the body is the headline and the FINDINGS list shows the detail.
+_BASELINE_DRIFT_SIGNALS = {
+    Signal.SENDER_DOMAIN_DRIFT,
+    Signal.SENDER_IP_GEOGRAPHY_CHANGE,
+    Signal.SENDER_SEND_TIME_ANOMALY,
+}
+_RISKY_SEVERITIES = {Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL}
+
+
+def _safe_template(evidence: list[Evidence]) -> str:
+    signals = {ev.signal for ev in evidence}
+    auth_passed = Signal.SPF_PASS in signals and Signal.DKIM_VALID in signals
+    new_sender = Signal.FIRST_SEEN_SENDER in signals
+    baseline_drift = bool(signals & _BASELINE_DRIFT_SIGNALS)
+    has_findings = any(ev.severity in _RISKY_SEVERITIES for ev in evidence)
+
+    if auth_passed and not new_sender and not baseline_drift:
+        return "This sender matches the pattern you've seen from them before."
+    if auth_passed and new_sender:
+        return (
+            "This is the first email you've received from this sender, "
+            "and their identity checks out."
+        )
+    if has_findings:
+        return "Some minor things turned up but nothing concerning."
+    return "Nothing in this email stood out as suspicious."
 
 
 class Pipeline:
@@ -79,17 +108,14 @@ class Pipeline:
 
     @staticmethod
     def _summarize(evidence: list[Evidence]) -> str:
-        """V2.S8 body builder, V2.S10-fix-C label check.
+        """V2.S8 body builder, V2.S10-fix-C label check, V2.S12 SAFE variants.
 
         Preference order:
           1. LLM-written body if any evidence has 'llm_summary_body' in details.
-          2. SAFE template when the final verdict label would be SAFE. We
-             check the actual label (computed from raw + correlation bonuses)
-             rather than evidence severity, because a SAFE-by-score email can
-             still carry one MEDIUM signal at low confidence without breaking
-             the SAFE label.
-          3. Fallback to the top evidence's explanation (preserves V1 behavior
-             for SUSPICIOUS / MALICIOUS verdicts when the LLM didn't fire).
+          2. When the final verdict label would be SAFE, pick one of four
+             templated bodies based on which signals fired (variants 1-4 below).
+          3. Fallback to the top evidence's explanation for SUSPICIOUS or
+             MALICIOUS verdicts when the LLM didn't fire (V1 behavior).
         """
         if not evidence:
             return "No suspicious signals detected."
@@ -103,7 +129,7 @@ class Pipeline:
             evidence, compute_raw_score(evidence)
         )
         if label_from_score(final_score) == "SAFE":
-            return "Authentication and sender check out, no suspicious content detected."
+            return _safe_template(evidence)
 
         top = sorted(
             evidence,
