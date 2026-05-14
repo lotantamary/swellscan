@@ -38,6 +38,16 @@ def _normalize_homoglyphs(s: str) -> str:
     return s.translate(table)
 
 
+def _is_subdomain_of_brand(from_domain: str, legit_domains: list[str]) -> bool:
+    """V2.S10 fix A: a legitimate brand subdomain (e.g. accounts.google.com,
+    mail.dropbox.com) is NOT a lookalike. Match if from_domain equals or is a
+    subdomain of any legit_domain."""
+    return any(
+        from_domain == legit or from_domain.endswith("." + legit)
+        for legit in legit_domains
+    )
+
+
 class SenderDetector(Detector):
     name = "sender"
 
@@ -48,7 +58,12 @@ class SenderDetector(Detector):
         display = email.from_.display_name.lower()
 
         for brand, legit_domains in KNOWN_BRANDS.items():
-            if brand in normalized_domain and from_domain not in legit_domains:
+            if (
+                brand in normalized_domain
+                and from_domain not in legit_domains
+                # V2.S10 fix A: legitimate subdomains of brand domains are NOT lookalikes.
+                and not _is_subdomain_of_brand(from_domain, legit_domains)
+            ):
                 for legit in legit_domains:
                     if _edit_distance(from_domain, legit) <= 5:
                         out.append(
@@ -106,8 +121,14 @@ class SenderDetector(Detector):
         # domain is NOT the sender's domain). Co-occurs with the freemail
         # signal above when applicable; the two are distinct evidence at
         # different specificity levels.
+        # V2.S10 fix A: a legitimate subdomain of the claimed brand is NOT
+        # a mismatch (e.g. "Google Security" from accounts.google.com).
         for brand, legit_domains in KNOWN_BRANDS.items():
-            if brand in display and from_domain not in legit_domains:
+            if (
+                brand in display
+                and from_domain not in legit_domains
+                and not _is_subdomain_of_brand(from_domain, legit_domains)
+            ):
                 out.append(
                     Evidence(
                         signal=Signal.DISPLAY_NAME_DOMAIN_MISMATCH,
