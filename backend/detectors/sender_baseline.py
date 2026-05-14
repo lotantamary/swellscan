@@ -4,7 +4,11 @@ from backend.detectors.base import Detector
 from backend.models.email import Email
 from backend.models.evidence import Evidence, Severity, Signal
 
-DKIM_DOMAIN_RE = re.compile(r"header\.d=([\w\.\-]+)", re.I)
+# Match both `header.d=domain.com` (older RFC 6376 style; the d= signing
+# domain) AND `header.i=@domain.com` (Gmail's more common Authentication-
+# Results format; the i= identity, which carries the signing domain after
+# an optional leading @). Either capture is the DKIM-signing domain.
+DKIM_DOMAIN_RE = re.compile(r"header\.[di]=@?([\w\.\-]+)", re.I)
 
 
 class SenderBaselineDetector(Detector):

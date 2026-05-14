@@ -35,11 +35,43 @@ def test_v2_correlation_credential_harvesting_trio():
     assert adjusted == raw + 15
 
 
+def test_v2_correlation_credential_harvesting_trio_safebrowsing_variant():
+    """LOOKALIKE + URL_KNOWN_PHISHING + SPF_FAIL = same credential-harvesting bonus +15.
+
+    Task 30.5 fix: the original rule only matched URL_KNOWN_MALICIOUS (VT).
+    Safe Browsing flags fire URL_KNOWN_PHISHING instead. The rule's semantic
+    is 'URL flagged by reputation service' which both signals satisfy.
+    """
+    evidence = [
+        _ev(Signal.LOOKALIKE_DOMAIN),
+        _ev(Signal.URL_KNOWN_PHISHING),
+        _ev(Signal.SPF_FAIL),
+    ]
+    raw = compute_raw_score(evidence)
+    adjusted = apply_correlation_bonuses(evidence, raw)
+    assert adjusted == raw + 15
+
+
 def test_v2_correlation_ai_targeted():
     """PROMPT_INJECTION + URL_KNOWN_MALICIOUS = AI-targeted bonus +20."""
     evidence = [
         _ev(Signal.PROMPT_INJECTION_ATTEMPT),
         _ev(Signal.URL_KNOWN_MALICIOUS),
+    ]
+    raw = compute_raw_score(evidence)
+    adjusted = apply_correlation_bonuses(evidence, raw)
+    assert adjusted == raw + 20
+
+
+def test_v2_correlation_ai_targeted_safebrowsing_variant():
+    """PROMPT_INJECTION + URL_KNOWN_PHISHING = same AI-targeted bonus +20.
+
+    Task 30.5 fix: parallel to the trio variant. Either reputation service's
+    hostile-URL signal paired with a prompt-injection attempt fires the rule.
+    """
+    evidence = [
+        _ev(Signal.PROMPT_INJECTION_ATTEMPT),
+        _ev(Signal.URL_KNOWN_PHISHING),
     ]
     raw = compute_raw_score(evidence)
     adjusted = apply_correlation_bonuses(evidence, raw)

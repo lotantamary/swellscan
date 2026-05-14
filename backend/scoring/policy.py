@@ -28,8 +28,25 @@ CORRELATION_BONUSES: list[dict] = [
         },
         "bonus": 15,
         "rationale": (
-            "Credential-harvesting trio: lookalike-domain + malicious URL + "
-            "SPF fail is the textbook fingerprint of a phishing campaign."
+            "Credential-harvesting trio (VirusTotal variant): lookalike-domain "
+            "+ malicious URL + SPF fail is the textbook fingerprint of a "
+            "phishing campaign."
+        ),
+    },
+    {
+        # Same playbook, Safe Browsing variant. The semantic of the rule is
+        # "URL flagged by reputation service"; we run two reputation services
+        # and either is sufficient evidence the URL is hostile.
+        "signals": {
+            Signal.LOOKALIKE_DOMAIN,
+            Signal.URL_KNOWN_PHISHING,
+            Signal.SPF_FAIL,
+        },
+        "bonus": 15,
+        "rationale": (
+            "Credential-harvesting trio (Safe Browsing variant): "
+            "lookalike-domain + Safe-Browsing-flagged URL + SPF fail is the "
+            "same attacker playbook as the VirusTotal variant."
         ),
     },
     {
@@ -39,8 +56,22 @@ CORRELATION_BONUSES: list[dict] = [
         },
         "bonus": 20,
         "rationale": (
-            "AI-targeted attack: an attacker sophisticated enough to ship a "
-            "payload AND target AI scanners is high-confidence malicious."
+            "AI-targeted attack (VirusTotal variant): an attacker "
+            "sophisticated enough to ship a payload AND target AI scanners "
+            "is high-confidence malicious."
+        ),
+    },
+    {
+        # AI-targeted, Safe Browsing variant. Parallel to the trio variant.
+        "signals": {
+            Signal.PROMPT_INJECTION_ATTEMPT,
+            Signal.URL_KNOWN_PHISHING,
+        },
+        "bonus": 20,
+        "rationale": (
+            "AI-targeted attack (Safe Browsing variant): same playbook as "
+            "the VirusTotal variant - hostile URL paired with prompt-injection "
+            "manipulation."
         ),
     },
     {

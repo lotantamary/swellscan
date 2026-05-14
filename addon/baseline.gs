@@ -91,9 +91,12 @@ function updateSenderHistoryAfterScan(payload, verdict) {
     entry.messages_seen += 1;
     entry.last_messages = [payload.message_id].concat(entry.last_messages).slice(0, RING_BUFFER_SIZE);
 
-    // Signing domain from Authentication-Results header (header.d=...)
+    // Signing domain from Authentication-Results header. Match both
+    // `header.d=domain.com` (the d= signing domain) AND
+    // `header.i=@domain.com` (Gmail's more common format; the i= identity
+    // with optional leading @). Either is the DKIM signing domain.
     const authRes = (payload.headers && payload.headers.authentication_results) || '';
-    const dkimMatch = authRes.match(/header\.d=([\w.\-]+)/i);
+    const dkimMatch = authRes.match(/header\.[di]=@?([\w.\-]+)/i);
     if (dkimMatch) {
       const dom = dkimMatch[1].toLowerCase();
       if (entry.typical_signing_domains.indexOf(dom) === -1) {
