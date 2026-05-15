@@ -46,7 +46,20 @@ _RISKY_SEVERITIES = {Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL}
 
 def _safe_template(evidence: list[Evidence]) -> str:
     signals = {ev.signal for ev in evidence}
-    auth_passed = Signal.SPF_PASS in signals and Signal.DKIM_VALID in signals
+    # Task 31.5 security-review fix: auth_passed must also require
+    # DMARC alignment to not have failed. SPF+DKIM passing while
+    # DMARC alignment fails is a real attack pattern (forwarded /
+    # relayed email where the visible From doesn't match the
+    # SPF-authorized envelope sender). Without the DMARC_FAIL exclusion,
+    # a SAFE-by-score email with DMARC_FAIL in evidence (HIGH * 0.9 = 22.5,
+    # just below the 25 threshold) would still hit Variant 1 / Variant 2
+    # bodies claiming the sender's "identity checks out" - directly
+    # contradicting the DMARC_FAIL finding shown in the FINDINGS list.
+    auth_passed = (
+        Signal.SPF_PASS in signals
+        and Signal.DKIM_VALID in signals
+        and Signal.DMARC_FAIL not in signals
+    )
     new_sender = Signal.FIRST_SEEN_SENDER in signals
     baseline_drift = bool(signals & _BASELINE_DRIFT_SIGNALS)
     has_findings = any(ev.severity in _RISKY_SEVERITIES for ev in evidence)
