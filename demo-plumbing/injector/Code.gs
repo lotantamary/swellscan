@@ -43,6 +43,7 @@ function seedDemoInbox() {
     buildDemo6_BecThreadHijack(),
     buildDemo7_SanitizationDefeat(),  // spare
     buildDemo8_ClassicPdfExe(),       // spare
+    buildDemo9_BehavioralFlaggedUrl(), // spare - urlscan gap coverage
   ];
 
   var injected = 0;
@@ -101,6 +102,7 @@ function resetDemoInbox() {
     '<swellscan-demo-6-bec-hijack-v2@demo.swellscan.io>',
     '<swellscan-demo-7-sanitization-v1@demo.swellscan.io>',
     '<swellscan-demo-8-pdfexe-v1@demo.swellscan.io>',
+    '<swellscan-demo-9-behavioral-url-v1@demo.swellscan.io>',
   ];
   var removed = 0;
   demoIds.forEach(function (id) {
@@ -538,4 +540,67 @@ function buildDemo8_ClassicPdfExe() {
   });
 
   return {label: 'demo-8-classic-pdfexe', messageId: messageId, rfc5322: rfc5322};
+}
+
+/**
+ * Demo 9 (spare): the urlscan blocklist-bypass moment. A clean-looking
+ * vendor quote email - auth passes (SPF, DKIM, DMARC), no brand
+ * impersonation, no urgency, no other suspicious content. The only thing
+ * the email carries is a fresh-domain phishing URL hosted on Tencent
+ * EdgeOne CDN. VirusTotal has not indexed the URL yet (404). Safe
+ * Browsing has not flagged it (clean). urlscan's public archive HAS
+ * tagged it as phishing/malicious.
+ *
+ * Expected verdict: SAFE label with score ~7-10 and a single MEDIUM
+ * finding `Url behavioral flagged`. The Variant-2 SAFE body fires
+ * ("first email...identity checks out") because the sender authenticated
+ * cleanly and is new to this user's baseline; the body refers to
+ * identity-layer trust while the finding flags the URL destination
+ * separately. Both are technically true at the same time and the card
+ * communicates the nuance instead of binary-classifying.
+ *
+ * Narrative: "VT hasn't indexed this URL. Safe Browsing hasn't flagged
+ * it. urlscan's behavioral archive caught it - this is the 4-24h
+ * blocklist-coverage gap that fresh phishing kits exploit. We surface
+ * the finding but don't escalate to MALICIOUS on a single source.
+ * Signal over noise - not every anomaly is a threat."
+ *
+ * URL chosen during demo prep (2026-05-15) from urlscan's recent
+ * phishing-tagged scans; verified at injection time to be (a) tagged
+ * malicious in urlscan and (b) absent from VirusTotal and Safe Browsing.
+ * If by demo time the gap has closed (VT/SB caught up), pick a fresh
+ * candidate via the same procedure documented in the README.
+ */
+function buildDemo9_BehavioralFlaggedUrl() {
+  var messageId = '<swellscan-demo-9-behavioral-url-v1@demo.swellscan.io>';
+  var date = new Date(Date.UTC(2026, 4, 13, 11, 30, 0));
+
+  var authResults =
+    'mx.google.com; ' +
+    'spf=pass (google.com: domain of quotes@atlaslogistics-pro.com designates 198.51.100.120 as permitted sender) smtp.mailfrom=quotes@atlaslogistics-pro.com; ' +
+    'dkim=pass header.d=atlaslogistics-pro.com header.s=mail; ' +
+    'dmarc=pass action=none header.from=atlaslogistics-pro.com';
+
+  var bodyText =
+    'Hello,\r\n\r\n' +
+    'Thank you for your interest in our services. Please find the quote ' +
+    'document at the link below.\r\n\r\n' +
+    'View quote: https://vilvet-7afwvhjjq6.edgeone.app/\r\n\r\n' +
+    'Let me know if you have any questions.\r\n\r\n' +
+    'Best regards,\r\n' +
+    'Atlas Logistics';
+
+  var rfc5322 = buildRfc5322Message({
+    from: '"Atlas Logistics" <quotes@atlaslogistics-pro.com>',
+    to: DEMO_ACCOUNT,
+    subject: 'Quote document for your review',
+    date: date,
+    messageId: messageId,
+    authResults: authResults,
+    returnPath: '<quotes@atlaslogistics-pro.com>',
+    originatingIp: '198.51.100.120',
+    bodyText: bodyText,
+  });
+
+  return {label: 'demo-9-behavioral-flagged-url', messageId: messageId, rfc5322: rfc5322};
 }
