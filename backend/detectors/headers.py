@@ -85,6 +85,7 @@ class HeadersDetector(Detector):
                     Severity.MEDIUM,
                     0.7,
                     "SPF soft-fail (sender authorized status unclear).",
+                    mitre=["T1566.002"],
                 )
             )
 
@@ -229,6 +230,7 @@ class HeadersDetector(Detector):
                     Severity.LOW,
                     0.6,
                     "Email is missing Message-ID header.",
+                    mitre=["T1566"],
                 )
             )
 
