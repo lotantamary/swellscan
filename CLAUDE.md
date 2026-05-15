@@ -196,7 +196,8 @@ pip-audit                       # known-CVE check before submission
 gcloud run deploy swellscan-backend \
   --source . --region us-central1 \
   --set-secrets="ANTHROPIC_API_KEY=anthropic-api-key:latest,VIRUSTOTAL_API_KEY=virustotal-api-key:latest,SAFEBROWSING_API_KEY=safebrowsing-api-key:latest" \
-  --set-env-vars="ALLOWED_USERS=swellscan.demo@gmail.com,OIDC_AUDIENCE=https://swellscan-backend-102679409749.us-central1.run.app" \
+  --set-env-vars="ALLOWED_USERS=swellscan.demo@gmail.com,OIDC_AUDIENCE=812475821064-s838lvgcgmc1nj4lbjqivpa48usi4t8v.apps.googleusercontent.com,URLSCAN_ENABLED=true" \
+  --max-instances=10 \
   --allow-unauthenticated  # app-layer OIDC enforcement, not IAM
 
 # One-time IAM grant needed before the first deploy (so Cloud Run's default
