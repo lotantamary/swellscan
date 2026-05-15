@@ -147,8 +147,8 @@ class Pipeline:
         if label == VerdictLabel.SAFE:
             return _safe_template(evidence)
 
-        top = sorted(
+        top = max(
             evidence,
-            key=lambda e: (-_SEVERITY_RANK[e.severity], -e.confidence),
-        )[0]
+            key=lambda e: (_SEVERITY_RANK[e.severity], e.confidence),
+        )
         return top.explanation
