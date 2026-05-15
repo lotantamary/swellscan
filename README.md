@@ -9,7 +9,6 @@ Swellscan applies Upwind's published runtime-first / layered-detection philosoph
 | | |
 |---|---|
 | **Live backend** | https://swellscan-backend-102679409749.us-central1.run.app |
-| **Live revision** | `swellscan-backend-00027-4s8` |
 | **Submitted** | 2026-05-15 |
 | **Author** | Lotan |
 
@@ -44,9 +43,9 @@ Malicious-email scoring is a crowded space, and the basics are table-stakes: aut
 
 1. **The LLM is untrusted by construction, and the attack itself becomes evidence.** Six independent layers of defense around the model (random per-request wrapper tag, body sanitization stack, Pydantic-enforced JSON output, no tool use, dedicated prompt-injection detector). When the email tries to manipulate the model, the manipulation text is used as evidence that raises the maliciousness score, not silently filtered.
 
-2. **Score-gated LLM, mirroring Upwind's RSAC 2026 architecture.** Cheap deterministic detectors run first. The expensive LLM call is invoked only when the cheap-detector score crosses 25, so roughly 60% of scans never pay LLM cost. The four concerns this addresses are Upwind's own published ones: latency, cost, false-positive tolerance, explainability.
+2. **Score-gated LLM, mirroring Upwind's RSAC 2026 architecture.** Cheap deterministic detectors run first. The expensive LLM call is invoked only when the cheap-detector score crosses 25. An estimated 60% of scans never pay LLM cost (the ratio we observe across the demo set, derived from the threshold mechanic plus a realistic SAFE-heavy email distribution). The four concerns this addresses are Upwind's own published ones: latency, cost, false-positive tolerance, explainability.
 
-3. **A correlation engine with named attacker playbooks.** Four hand-curated bonuses tied to actual attacker behavior (credential-harvesting trio, AI-targeted phishing, brand impersonation, thread-hijack signature). The card shows the user which playbook fired, not just the final score.
+3. **A correlation engine with named attacker playbooks.** Six hand-curated correlation rules covering four attacker playbooks (credential-harvesting trio and AI-targeted phishing each have VirusTotal + Safe Browsing variants; impersonation; thread-hijack signature). The card shows the user which playbook fired, not just the final score.
 
 4. **Per-sender baseline lives on Google's user infrastructure, never on our backend.** The backend is fully stateless. No PII repository to leak. We could not read user data even as the script's owner.
 
@@ -86,6 +85,8 @@ Three components, one direction of trust, stateless backend.
 2. The backend ([`backend/auth.py`](backend/auth.py)) verifies the JWT against Google's public keys, checks the email against an allowlist, and enforces a per-user 100-call sliding-window rate limit.
 3. The pipeline ([`backend/pipeline.py`](backend/pipeline.py)) dispatches the seven cheap detectors in parallel via `asyncio.gather`. Each emits `Evidence` objects. The aggregator computes the score and applies correlation bonuses. If the score is at least 25, the LLM detector runs as a second opinion.
 4. The aggregator runs once more with the LLM's evidence included, builds the verdict + summary body, and returns. The Add-on renders the card and writes the updated sender record back to `UserProperties` under a `LockService` block.
+
+**Latency and graceful degradation.** SAFE short-circuits return in under a second. LLM-firing scans take 5-15 seconds (the Anthropic round-trip dominates on our ~11KB prompts; the per-call timeout is 30s). If the LLM call fails or times out, the pipeline logs the failure with the request ID and returns the verdict based on cheap-detector evidence alone. The user always gets a verdict.
 
 ### Invariants
 
@@ -139,7 +140,7 @@ Two fronts: attackers operating *through* email content, and attackers operating
 | Non-root container (uid 1001), `python:3.12-slim`, pinned dependencies | [`Dockerfile`](Dockerfile) |
 | Exception logging redacts request URLs (Safe Browsing puts the API key in the query string) | [`backend/clients/safebrowsing.py`](backend/clients/safebrowsing.py) |
 
-`pip-audit` cleared three CVEs on submission day (fastapi, starlette, python-dotenv bumped). An end-to-end security review of the deployed revision returned, verbatim: *"No high-confidence findings beyond what is already addressed."*
+`pip-audit` cleared three CVEs on submission day (fastapi, starlette, python-dotenv bumped). An automated end-to-end security review of the deployed revision found no high-confidence findings beyond the defenses already in place.
 
 ---
 
@@ -161,7 +162,7 @@ I picked **layered detection where the LLM is gated on a cheap-detector score >=
 
 ### 3. Named-playbook correlation, not linear scoring alone
 
-I picked **four hand-curated correlation bonuses tied to attacker playbooks** over a purely linear sum (and over the opposite extreme: an opaque ML scoring model). Four named playbooks: credential-harvesting trio, AI-targeted phishing, brand impersonation, thread-hijack signature. The card shows the user which playbook matched, not just the final number. Transparency over black-box.
+I picked **six hand-curated correlation rules covering four attacker playbooks** over a purely linear sum (and over the opposite extreme: an opaque ML scoring model). The four playbooks: credential-harvesting trio (VirusTotal + Safe Browsing variants), AI-targeted phishing (VirusTotal + Safe Browsing variants), impersonation, thread-hijack signature. The card shows the user which playbook matched, not just the final number. Transparency over black-box.
 
 ### 4. Client-side baseline, not a server-side history database
 
@@ -233,39 +234,62 @@ Two install paths. Both are usable today. A third (Google Workspace Marketplace 
 
 ### Path A: use the live shared backend (recommended for review)
 
-Run Swellscan against your own Gmail without standing up infrastructure. ~15 minutes including the email round-trip.
+Run Swellscan against your own Gmail without standing up infrastructure. ~15-20 minutes including a brief email round-trip.
 
-1. **Email me** (`lotantamary@gmail.com`) with your Gmail address and your Apps Script project's OAuth client ID (you will produce this in step 4).
-2. **Wait for confirmation.** I will add you to the `ALLOWED_USERS` allowlist and add your OAuth client ID to the `OIDC_AUDIENCE` audience list, then redeploy. ~10 minutes.
-3. **Create a new Apps Script project** at https://script.new. Name it "Swellscan".
-4. **Paste the six files** from this repo's [`addon/`](addon/) folder into the editor (`appsscript.json`, `setup.gs`, `client.gs`, `render.gs`, `Code.gs`, `baseline.gs`). The OAuth client ID is auto-generated; copy it from **Project Settings -> IDs -> OAuth client ID**.
-5. **Run `setup()` once** from the editor. It writes `BACKEND_URL` and `OIDC_AUDIENCE` to `ScriptProperties`.
-6. **Install the test deployment:** click **Deploy -> Test deployments -> Install**. Open Gmail, click the Swellscan icon in the right sidebar on any email, and watch the verdict card render.
+**You do not need your own VirusTotal, Safe Browsing, or Anthropic API keys.** The shared backend uses mine; your install authenticates to it via Google OIDC. Every request is bounded by a per-user rate limit (100 calls / 24h), a Cloud Run instance cap (`--max-instances=10`), and an Anthropic prepaid $5 hard cap, so usage cannot exhaust the budget by accident or by design.
+
+1. **Create a new Apps Script project** at https://script.new. Click the title at the top-left and rename it to "Swellscan".
+2. **Get your OAuth client ID.** In the editor, click the gear icon **Project Settings** on the left sidebar. Under "IDs", copy the **OAuth client ID** value (it ends in `.apps.googleusercontent.com`). You will paste this into the email in step 3.
+3. **Email me** at `lotantamary@gmail.com` with two items: (a) your Gmail address, and (b) the OAuth client ID from step 2. I will add you to the `ALLOWED_USERS` allowlist and your OAuth client ID to the `OIDC_AUDIENCE` audience list on the backend, then redeploy. ~10 minutes round-trip.
+4. **Paste the six Add-on files** into the editor. In this repo, see [`addon/`](addon/) and copy each file's contents into a matching file in the editor. Use the **+ Files** button at the top of the file list to add each one:
+   - `appsscript.json` (the editor hides this by default; in **Project Settings**, check the box "Show 'appsscript.json' manifest file in editor")
+   - `setup.gs`
+   - `client.gs`
+   - `render.gs`
+   - `Code.gs`
+   - `baseline.gs`
+5. **Save** the project (Ctrl+S / ⌘+S).
+6. **Run `setup()` once.** In the function dropdown at the top of the editor, select `setup`. Click **Run**. The first time you do this, Google prompts you to authorize the script:
+   - Click **Review permissions**, choose your Gmail account
+   - You will see "Google hasn't verified this app." Click **Advanced** -> **Go to Swellscan (unsafe)** -> **Allow**
+   - The "unsafe" label appears because this is a test deployment, not a published Marketplace listing. The scopes shown are Gmail read-only (sandbox metadata + body) + script.external_request + userinfo.email + script.locale.
+7. **Install as a test deployment:** click **Deploy** -> **Test deployments** -> **Install**.
+8. **Open Gmail in a new tab.** The Swellscan icon appears in the right sidebar. Click any email, then click the Swellscan icon to scan it. The verdict card renders inline. If the icon does not show up, refresh Gmail (Ctrl+R / ⌘+R).
 
 ### Path B: self-host the backend
 
 Full reproducibility on a fresh GCP project. 1-2 hours depending on GCP familiarity.
 
-1. **Clone and install dependencies:**
+1. **Get three API keys** (all free-tier compatible; you only need to add a payment method for Anthropic, which credits a $5 prepaid balance):
+   - **Anthropic** -> https://console.anthropic.com/settings/keys (add ~$5 prepaid balance, then create a key)
+   - **VirusTotal** -> https://virustotal.com/gui/my-apikey (free tier: 500 calls / day)
+   - **Google Safe Browsing v4** -> in your GCP project (step 3 below), enable the Safe Browsing API, then create a key at https://console.cloud.google.com/apis/credentials
+   - **urlscan.io** -> no key needed (Swellscan uses the anonymous tier)
+2. **Clone the repo and install Python dependencies:**
    ```bash
    git clone https://github.com/<your-user>/swellscan.git
    cd swellscan
-   pip install -r backend/requirements.txt
+   pip install -r requirements.txt
    ```
-2. **Create a fresh GCP project**, enable billing (free trial works), and enable the Cloud Run, Cloud Build, and Secret Manager APIs.
-3. **Provision three secrets** in Secret Manager (your own keys from Anthropic, VirusTotal, Safe Browsing):
+3. **Create a fresh GCP project**, enable billing on it (free trial works), and log into `gcloud` against it:
+   ```bash
+   gcloud auth login
+   gcloud config set project <YOUR_PROJECT_ID>
+   gcloud services enable run.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com safebrowsing.googleapis.com
+   ```
+4. **Provision the three secrets** in Secret Manager (paste your keys from step 1 in place of the placeholders):
    ```bash
    echo -n "sk-ant-..." | gcloud secrets create anthropic-api-key --data-file=-
    echo -n "vt-..."     | gcloud secrets create virustotal-api-key --data-file=-
    echo -n "sb-..."     | gcloud secrets create safebrowsing-api-key --data-file=-
    ```
-4. **Grant the default Cloud Run compute service account access to the secrets:**
+5. **Grant the default Cloud Run compute service account access to the secrets** (replace `<PROJECT_NUMBER>` with the numeric project number you can find via `gcloud projects describe <YOUR_PROJECT_ID>`):
    ```bash
-   gcloud projects add-iam-policy-binding <YOUR_PROJECT> \
+   gcloud projects add-iam-policy-binding <YOUR_PROJECT_ID> \
      --member="serviceAccount:<PROJECT_NUMBER>-compute@developer.gserviceaccount.com" \
      --role="roles/secretmanager.secretAccessor"
    ```
-5. **Deploy.** The same flag set the live revision uses:
+6. **Deploy.** The same flag set the live revision uses (for `OIDC_AUDIENCE`, plug in the OAuth client ID from Path A step 2 of your own Apps Script project):
    ```bash
    gcloud run deploy swellscan-backend \
      --source . --region us-central1 \
@@ -274,10 +298,11 @@ Full reproducibility on a fresh GCP project. 1-2 hours depending on GCP familiar
      --max-instances=10 \
      --allow-unauthenticated
    ```
-   `--allow-unauthenticated` means Cloud Run does not enforce IAM; the application enforces auth via the OIDC token verification in [`backend/auth.py`](backend/auth.py).
-6. **Install the Add-on** as in Path A steps 3-6, but during `setup()` set `BACKEND_URL` to your own Cloud Run URL.
+   `--allow-unauthenticated` means Cloud Run does not enforce IAM; the application enforces auth via OIDC token verification in [`backend/auth.py`](backend/auth.py). **At the end of the deploy, `gcloud` prints the Cloud Run service URL** in the form `https://swellscan-backend-XXXXX.us-central1.run.app`. Copy this URL.
+7. **Edit [`addon/setup.gs`](addon/setup.gs)** in your local clone: replace both `BACKEND_URL` and `OIDC_AUDIENCE` with the Cloud Run URL from step 6. (Both values can be identical for direct Cloud Run access; the field is kept separate so a future custom-domain deployment can change one without breaking the other.)
+8. **Install the Add-on** following Path A steps 1-8 above, but in Path A step 4, paste your *edited* `setup.gs` rather than the unmodified one from the repo.
 
-**If the Add-on returns 401** when you click the icon, the `OIDC_AUDIENCE` env var on the backend probably does not include your Apps Script project's OAuth client ID. `ScriptApp.getIdentityToken()` mints JWTs whose `aud` claim is the OAuth client ID, *not* the Cloud Run URL. Update the env var and redeploy.
+**If the Add-on returns 401** when you click the icon: the `OIDC_AUDIENCE` env var on the backend does not include your Apps Script project's OAuth client ID. `ScriptApp.getIdentityToken()` mints JWTs whose `aud` claim is the OAuth client ID, *not* the Cloud Run URL. Redeploy with `--set-env-vars="OIDC_AUDIENCE=<your-oauth-client-id>,..."` and try again.
 
 ### Tests
 
