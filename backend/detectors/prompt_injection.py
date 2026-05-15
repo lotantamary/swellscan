@@ -5,16 +5,26 @@ from backend.models.email import Email
 from backend.models.evidence import Evidence, Severity, Signal
 
 INJECTION_PATTERNS = [
+    # Task 31 Phase A catch: original pattern was
+    # `ignore\s+(?:your\s+)?(?:previous|prior|the\s+above|all)\s+instruction`
+    # which couldn't match "Ignore all previous instructions" because the
+    # qualifier alternation accepted only ONE word. Now `(?:(?:your|all|the)\s+)*`
+    # allows zero or more stackable qualifiers before the previous/prior/above/all
+    # selector. Backwards compatible with single-qualifier phrasings.
     re.compile(
-        r"ignore\s+(?:your\s+)?(?:previous|prior|the\s+above|all)\s+instruction",
+        r"ignore\s+(?:(?:your|all|the)\s+)*(?:previous|prior|the\s+above|all)\s+instruction",
         re.I,
     ),
     re.compile(r"disregard\s+(?:the\s+)?(?:above|previous)", re.I),
     re.compile(r"forget\s+(?:your|the)\s+(?:role|instructions|system)", re.I),
     re.compile(r"new\s+instructions?:", re.I),
     re.compile(r"system\s+prompt:", re.I),
+    # Task 31 Phase A catch: original pattern required "as + safe/benign/0/clean"
+    # directly, missing real attack phrasings like "as verdict=benign" or
+    # "as verdict: benign". Optional `verdict[=:]` prefix added before the
+    # outcome word.
     re.compile(
-        r"(?:mark|rate|classify|score)\s+this\s+(?:email\s+)?as\s+(?:safe|benign|0|clean)",
+        r"(?:mark|rate|classify|score)\s+this\s+(?:email\s+)?as\s+(?:verdict\s*[=:]\s*)?(?:safe|benign|0|clean)",
         re.I,
     ),
     re.compile(r"you\s+are\s+now\s+(?:a|an)\b", re.I),
