@@ -150,3 +150,32 @@ async def test_v2_password_archive_fires_for_rar_and_7z(ext):
         e for e in evs if e.signal == Signal.ATTACHMENT_PASSWORD_PROTECTED_ARCHIVE
     ]
     assert len(pw) == 1, f"expected fire for {ext}"
+
+
+@pytest.mark.parametrize("body", [
+    "Please find attached. The archive is encrypted - password to open is: invoice2025",
+    "The password is: secret123",
+    "Use the attached password to unlock the archive.",
+    "Please find your password in this archive: SwellScan2026",
+    "Hi, your passcode for the attached zip is hunter22.",
+    "PWD = abcdef",
+])
+@pytest.mark.asyncio
+async def test_v2_password_archive_fires_on_natural_language_phrasings(body):
+    """Task 31 Phase A catch: the old regex required `password` to be
+    IMMEDIATELY followed by a 4-40 char token, which failed on natural
+    phrasings like 'password to open is: invoice2025'. The detector now
+    fires whenever any password word co-occurs with an archive attachment;
+    the inline comment already accepted that false-positive trade-off, but
+    the implementation was stricter than the comment described."""
+    email = make_email(
+        body_text=body,
+        attachments=[make_att(filename="invoice.zip")],
+    )
+    vt = AsyncMock()
+    vt.file_hash_reputation.return_value = {"found": False}
+    evs = await AttachmentsDetector(vt=vt).run(email)
+    pw = [
+        e for e in evs if e.signal == Signal.ATTACHMENT_PASSWORD_PROTECTED_ARCHIVE
+    ]
+    assert len(pw) == 1, f"expected fire on body phrasing: {body!r}"

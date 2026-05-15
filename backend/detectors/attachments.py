@@ -43,11 +43,20 @@ COMMON_DECOY_EXTENSIONS = {".pdf", ".doc", ".xls", ".jpg", ".png"}
 # password-protected. Correlation with a body password-token is the signal.
 ARCHIVE_EXTENSIONS = {".zip", ".rar", ".7z"}
 
-# Body-language pattern for password sharing. The `[:=]?` is optional so we
-# also catch "Password is xyz" and "Pwd 1234"; accepted false-positive risk
-# is bounded by the requirement that an archive attachment ALSO be present.
+# Body-language pattern for password sharing. The signal we want is
+# "body mentions a password word AND there's an archive attachment" -
+# co-occurrence is what indicates the hash-scanner-evasion pattern.
+# Task 31 Phase A catch: the previous regex required the password word
+# to be IMMEDIATELY followed by a 4-40 char token, which failed on
+# natural-language phrasings like "Password to open is: invoice2025"
+# or "The password is: secret123". We caught this on demo 5 - the
+# textbook V2.S4 demo email returned SAFE because the regex never
+# matched. Dropping the token-extraction part: any mention of
+# password/passcode/pwd as a whole word, paired with an archive
+# attachment, fires the signal. False-positive risk bounded by the
+# attachment co-requirement.
 _BODY_PASSWORD_RE = re.compile(
-    r"\b(?:password|passcode|pwd)\s*[:=]?\s*\S{4,40}",
+    r"\b(?:password|passcode|pwd)\b",
     flags=re.I,
 )
 
