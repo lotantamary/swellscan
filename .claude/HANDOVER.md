@@ -2,6 +2,14 @@
 
 This file is the briefing for any AI session picking up Swellscan mid-implementation. The same text gets pasted into the chat when starting a fresh session for maximum first-turn compliance. The on-disk copy exists as (1) a mid-session memory refresh, (2) a starting point for short future-session prompts, and (3) project documentation.
 
+**SECURITY-FIRST: THE PRODUCT MUST DEFEND ITSELF ON EVERY FRONT** (added 2026-05-15). The product's job is to score malicious email, but its OWN security posture is equally critical and graded under the assignment's "security awareness" rubric. The Task 31.5 cleanup and Task 32 security review must verify that the product is hardened against TWO threat vectors:
+
+1. **Email-borne attackers** (the obvious one): self-defending LLM, body sanitization, untrusted-content wrapping with random-nonce tags, output validation, Pydantic-enforced schema, no tool use / no outbound calls from the LLM, hash-only attachment handling, reputation-API delegation for URLs (no direct fetching).
+
+2. **Attackers targeting the product itself** (the often-missed one): OIDC token authentication with no long-lived shared secrets, asymmetric crypto via Google JWKs, ~1-hour token validity, per-user rate-limiter at the auth boundary (V2.S14), Cloud Run `--max-instances=10` for parallelism cap, Anthropic prepaid $5 hard cap + monthly $20 spend limit (cost-exhaustion attack defense), Secret Manager (not env vars in code), stateless backend (no PII repository to leak), email body never persisted, structured-logging field allowlist (DO log: request_id, sender DOMAIN only, score, verdict, latency; NEVER log: body, subject, recipient, attachment filenames, URLs, hashes), non-root container user, app-layer OIDC enforcement (not IAM), ALLOWED_USERS allowlist + OIDC_AUDIENCE allowlist.
+
+Both fronts must be verified - end to end - during the cleanup + security review. The product is a security product; its own security IS the product's character witness.
+
 **Last updated: 2026-05-15 (submission day), end of "V2 deploy + demo validation" session. Tasks 29, 30, 30.5, 31 ALL COMPLETE. Live revision `swellscan-backend-00021-8zn`. 6 planned demos + 2 spares all verified end-to-end with screenshots. 11 dogfood-caught plan-drift fixes during demo pass (see memory `session_v2_deploy_demo_validation.md`). Next session opens at Task 31.5 (cleanup + code-review with fresh eyes) followed by Task 32 (security review), Task 34 (README - creativity emphasis), Task 35 (CLAUDE.md refresh), Task 37 (PDF), Task 38 (SUBMIT).**
 
 ---
