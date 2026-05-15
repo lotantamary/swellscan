@@ -1,3 +1,4 @@
+from backend._freemail import FREEMAIL_DOMAINS
 from backend.detectors.base import Detector
 from backend.models.email import Email
 from backend.models.evidence import Evidence, Severity, Signal
@@ -10,14 +11,6 @@ KNOWN_BRANDS: dict[str, list[str]] = {
     "amazon": ["amazon.com"],
     "dropbox": ["dropbox.com"],
     "bank": [],  # generic
-}
-FREEMAIL = {
-    "gmail.com",
-    "outlook.com",
-    "yahoo.com",
-    "hotmail.com",
-    "icloud.com",
-    "proton.me",
 }
 
 
@@ -97,7 +90,7 @@ class SenderDetector(Detector):
                 break
 
         # display name claims a brand but domain is freemail
-        if from_domain in FREEMAIL:
+        if from_domain in FREEMAIL_DOMAINS:
             for brand in KNOWN_BRANDS:
                 if brand in display and brand not in from_domain:
                     out.append(

@@ -1,5 +1,6 @@
 import re
 
+from backend._freemail import FREEMAIL_DOMAINS
 from backend.detectors.base import Detector
 from backend.models.email import Email
 from backend.models.evidence import Evidence, Severity, Signal
@@ -27,19 +28,6 @@ def _registrable_parent(domain: str) -> str:
     return ".".join(parts[-2:])
 
 
-# V2.S3a: known freemail domains. Corporate-From + freemail-Reply-To = strong
-# BEC indicator. TODO (future cleanup): consolidate with FREEMAIL set in
-# sender.py into a shared constants module.
-FREEMAIL_DOMAINS = {
-    "gmail.com",
-    "outlook.com",
-    "yahoo.com",
-    "hotmail.com",
-    "icloud.com",
-    "proton.me",
-    "aol.com",
-    "live.com",
-}
 
 # V2.S3b: Return-Path transactional-mailer allowlist. These domains legitimately
 # differ from the From: domain because the sender uses a third-party mail
