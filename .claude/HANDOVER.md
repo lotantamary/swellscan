@@ -20,7 +20,7 @@ A clean README the recruiter remembers + a live demo where she walks out citing 
 
 Both fronts must be verified - end to end - during the cleanup + security review. The product is a security product; its own security IS the product's character witness.
 
-**Last updated: 2026-05-15 (submission day), end of "V2 deploy + demo validation" session. Tasks 29, 30, 30.5, 31 ALL COMPLETE. Live revision `swellscan-backend-00021-8zn`. 6 planned demos + 2 spares all verified end-to-end with screenshots. 11 dogfood-caught plan-drift fixes during demo pass (see memory `session_v2_deploy_demo_validation.md`). Next session opens at Task 31.5 (cleanup + code-review with fresh eyes) followed by Task 32 (security review), Task 34 (README - creativity emphasis), Task 35 (CLAUDE.md refresh), Task 37 (PDF), Task 38 (SUBMIT).**
+**Last updated: 2026-05-15 (submission day), end of "Phase 6 cleanup + security" session. Tasks 29-32 ALL COMPLETE. Live revision `swellscan-backend-00027-4s8`. 186 tests passing. 6 planned demos + 3 spares (demos 7, 8, 9 - demo 9 NEW this session: urlscan blocklist-bypass) all verified end-to-end. Task 31.5 surfaced 17+ cleanup candidates across simplify + code-review skills; 7 landed as Tier 1/2, 4 deferred to README backlog, urlscan wire-up + cache fix landed as bonus work. Task 32 cleared 3 pip-audit CVEs (fastapi/starlette/python-dotenv bumped) and security-review skill found no high-confidence findings. Next session opens at Task 34 (README full content - creativity emphasis), then Task 35 (CLAUDE.md final refresh), Task 37 (PDF), Task 38 (SUBMIT).**
 
 ---
 
@@ -139,12 +139,12 @@ The ones most important to read FIRST for the upcoming work:
 ## CURRENT STATE OF THE CODE
 ═══════════════════════════════════════════════════════════════════════
 
-  **V1 + V2 + Phase 6 demo validation (Tasks 29, 30, 30.5, 31) ALL complete.** Next: Task 31.5 (cleanup + code-review with fresh eyes) → Task 32 (security review) → Task 34 (README full content - **creativity emphasis**) → Task 35 (refresh CLAUDE.md) → Task 37 (PDF cover sheet) → Task 38 (submit). Submission deadline TODAY 2026-05-15 EOD.
+  **V1 + V2 + Phase 6 (Tasks 29-32) ALL complete.** Next: Task 34 (README full content - **creativity emphasis**) → Task 35 (final CLAUDE.md refresh) → Task 37 (PDF cover sheet) → Task 38 (submit). Submission deadline TODAY 2026-05-15 EOD.
 
-  Backend status: BUILT, TESTED, DEPLOYED at Task 31 state. **167 tests passing** (53 V1 baseline + 83 V2 + 31 Task 31 regression tests).
+  Backend status: BUILT, TESTED, DEPLOYED post-Task-32. **186 tests passing** (167 from Task 31 + 14 new urlscan client tests + 3 send-time-anomaly range tests + 2 query-format tests).
 
     Live URL: https://swellscan-backend-102679409749.us-central1.run.app
-    Live revision: swellscan-backend-00022-bsr  (Task 31 final - prompt-injection regex broadening, 2026-05-15)
+    Live revision: swellscan-backend-00027-4s8  (Task 32 final - pip-audit deps bump: fastapi 0.136.1 + starlette 1.0.0 + python-dotenv 1.2.2, all 3 CVEs cleared)
     /health                  → {"status":"ok"}
     POST /score              → OIDC-protected (401 on bad tokens)
     /illustration/{label}    → static PNG, 1-hour cache
@@ -175,6 +175,31 @@ The ones most important to read FIRST for the upcoming work:
     - V2.S10 Fix C: SAFE body uses verdict label, not evidence severity
     - V2.S12 four-variant SAFE body templates (relationship+auth, new-sender+auth, minor-findings, truly-clean)
     - V2.S14 multi-audience OIDC support (`OIDC_AUDIENCE` env var is now comma-separated; unblocks "Path A" install for other Apps Script projects sharing this backend) + per-user rate limiter (`backend/rate_limit.py`, 100 calls / 24h sliding window, in-memory approximate, wired into `verify_request`) + Cloud Run `--max-instances=10` flag
+
+  **Task 31.5 (cleanup) + Task 32 (security) additions this session:**
+    - Tier 1 cleanup: shared security-patterns module (sanitizer/detector regex parity), unified FREEMAIL set, OIDC audience cache + empty-list refusal at import (the latter is a real auth-hardening fix - google-auth's verify_oauth2_token silently skips audience verification when given an empty audience list)
+    - Tier 1 #4: urlscan wired up as the third URL-reputation source. The design doc + V1/V2 plans all promised three reputation sources; code only wired two until this session. Wrapper relaxed to fire on urlscan's phishing/malicious tags (anonymous API doesn't expose the strict consensus field); query-format bug fix (URL must be wrapped in quotes inside page.url:...); timeout bumped 4s -> 15s; gap-only emission so urlscan only fires when VT and SB are both silent.
+    - Demo 9 (spare): blocklist-bypass / urlscan moment. Atlas Logistics quote email with a real urlscan-flagged URL on Tencent EdgeOne CDN that VT and Safe Browsing have not yet indexed. SAFE/7/100 with one finding: `Url behavioral flagged`. Demonstrates the nuanced "signal over noise" verdict layer rather than binary classification.
+    - Tier 2 cleanup: score computed once per request (instead of three times), stringly-typed comparisons replaced with VerdictLabel.SAFE and LLMDetector.name, max() instead of sorted()[0] for top-evidence selection.
+    - Tier 1+2 of code-review skill: LLM trust boundary expanded to cover all three prompt tags (evidence_json, email_metadata, untrusted_content) - not just the wrapped body - so a hostile subject or display_name can't smuggle directives past the LLM. _sanitize_body now also applied to subject and display_name (the same V2 sanitization stack the body got). Send-time anomaly fix: was set-membership against observed hours (false-positive engine), now range check with min-3-observations gate. SAFE Variant 1/2 bodies excluded when DMARC_FAIL is in evidence (was a card-displayed-lie - "identity checks out" with DMARC_FAIL in findings). MITRE tags added to SPF_SOFTFAIL + MISSING_MESSAGE_ID. Exception logging redacted on safebrowsing + virustotal clients (Safe Browsing puts API key in URL; httpx exception __str__ rendered the key into logs). CLAUDE.md deploy snippet brought back in sync with prod (had stale OIDC_AUDIENCE URL form + missing max-instances + missing URLSCAN_ENABLED).
+    - Add-on cache fix (Code.gs): the Gmail Add-on framework re-invokes onGmailMessageOpen twice per open. The first scan trains the baseline on the just-observed signals; the second scan reads the now-polluted baseline and returns a degraded verdict. Cache the first verdict per message_id (5-min TTL) so phantom re-invocation returns the cached card. Only demo 6 (BEC thread-hijack) showed the bug visibly - it leans entirely on baseline drift signals - but the fix is global.
+    - Task 32 (pip-audit): 3 CVEs cleared by bumping fastapi 0.115.6 -> 0.136.1, starlette 0.41.3 -> 1.0.0, python-dotenv 1.0.1 -> 1.2.2. starlette upgrade was a major-version jump; live-tested all 9 demos on the bumped revision, all verdict labels preserved.
+    - Task 32 (security-review skill): final defensive sweep. Result verbatim: "No high-confidence findings beyond what is already addressed." Auth + path-serving + external clients + LLM defense + Add-on rendering + baseline storage + container hygiene + Pydantic boundaries + rate-limit keyspace + secret handling all verified clean.
+
+  **Documentation refresh this session:**
+    - design.md §3.1 (untrusted-content tag name), §3.2 (PNG vs SVG), §5.2 (Evidence.explanation max 2000), §6 ("eight detectors" + new §6.8 bec_language), §6.3 (URL_BEHAVIORAL_FLAGGED + urlscan rationale + gap-only emission + kill switch), §6.5 (PAYLOAD_FRAGMENTATION_ATTEMPT), §6.7 (LLM threshold corrected from "25-75 band" to ">= 25"), §7.5 (timeout 30s), §9.2 (multi-audience OIDC + empty-list refusal + per-user rate limiter), §9.4 (deploy command with OAuth client ID + URLSCAN_ENABLED + max-instances), §6.2 + §6.3 (homoglyph + URL_TEXT_HREF_MISMATCH softened to honest "leetspeak only, Unicode confusables in Future Work").
+    - V2 plan got a new "Cleanup deferred from Task 31.5 (for README 'before next production deploy' section)" subsection with 4 items: Reply-To/Return-Path block consolidation, shared VirusTotalClient, domain_of() helper, Add-on detectors-fired count duplication. These go into the README's Future Work area under a "Cleanup before next deploy" subheading.
+
+  **Demo set: 9 demos total** (6 planned 1-6, 3 spares 7-9):
+    1. Google Cloud welcome (SAFE/0/100) - baseline-known SAFE reference
+    2. Microsoft credential trio (MALICIOUS/100/100) - phishing playbook + correlation
+    3. Dropbox lookalike (SUSPICIOUS/52/100) - brand impersonation, three-tier spectrum
+    4. Prompt injection + tag-escape (MALICIOUS) - self-defending LLM headline
+    5. invoice.zip + body password (SUSPICIOUS) - V2.S4 password-archive correlation
+    6. BEC thread-hijack (MALICIOUS/100/100) - marquee BEC demo + thread-hijack correlation. Needs `resetDemoSeeds()` before the live show.
+    7 (spare). Sanitization defeat (SUSPICIOUS/53/100) - V2.S2 layered sanitization visible
+    8 (spare). invoice.pdf.exe (MALICIOUS/75/100) - classic double-extension
+    9 (spare, NEW). Atlas Logistics blocklist-bypass (SAFE/7/100) - urlscan gap coverage
 
   All three signature features live and verified at V2 state:
     1. Self-defending LLM (V1 + V2.S2 defense-in-depth additions)
@@ -280,7 +305,35 @@ These came up during V2.S10-V2.S14 and need to land in the README. They are NOT 
 ## IMMEDIATE NEXT ACTION
 ═══════════════════════════════════════════════════════════════════════
 
-Start at Task 31.5 (mid-build cleanup: invoke `simplify` skill + `code-review:code-review` skill with fresh eyes). All demo cards are screenshotted. The MAIN priority for the new session is the cleanup + README - and the README MUST emphasize creativity (the wow moments) and substantiate Swellscan's edge over a simple email-scanner product. Code review should flag the prompt_injection regex narrowness, the `[198.51` IP-prefix cosmetic bug (leading bracket from `X-Originating-IP: [...]`), and the "HIGH conf" semantic ambiguity. After cleanup: Task 32 (pip-audit + security-review), Task 34 (README full content), Task 35 (refresh CLAUDE.md), Task 37 (PDF cover sheet), Task 38 (submit to ou-bootcamp-interviewers@upwind.io). Default skill: `superpowers:executing-plans`. Commit + push after every task. DO NOT re-scan demo 6 v2 without first running `resetDemoSeeds()` - the baseline updater pollutes orbitalvendor's typical_signing_domains after each scan, killing the drift moment on subsequent scans. Before live demo with Bar Naor: run `resetDemoSeeds` once.
+Start at **Task 34 (README full content)**. This is the GRADED artifact Bar Naor reads BEFORE the live interview. The structure is LOCKED in the parent implementation plan at Task 34 Step 1: The problem / What Swellscan does / Three deliberate design choices / Architecture / Setup & deployment / Trade-offs and limitations / What I'd build next / Scalability note / Tech stack / Tests / Security posture / Acknowledgements. Do not add new top-level sections. Each section foregrounds locked moments from `project_demo_backbone.md` (13 moments + 9 demos).
+
+Sourcing for the README:
+  - Three deliberate design choices: design doc §3.1 (self-defending LLM), §3.2 (wave + character arc), §3.3 (per-sender baseline). Plus the urlscan gap-coverage story from this session as a fourth design choice if the section can hold it, or fold into Architecture.
+  - Architecture: design doc §4 invariants + §5 data model + §6 detectors (eight). Cross-check the eight detector names + signals against the actual `backend/detectors/` directory and `backend/models/evidence.py` Signal enum.
+  - Setup & deployment: three install paths (A = use shared backend, B = self-host, C = Marketplace publication as Future Work). See HANDOVER.md "REMEMBER FOR TASK 34" section below for the canonical path A/B/C copy.
+  - Trade-offs and limitations: V2 plan ## Limitations section (multi-modal, per-message, no URL fetching / no body persistence). Plus this-session additions: HIGH conf wording cosmetic, [198.51 IP-prefix cosmetic, automatic baseline learning (Future Work item), urlscan signal scoped to anonymous-API tag verdicts.
+  - What I'd build next: V2 plan ## Future Work entries (the 13 from threat-research scan + this-session additions: full Unicode-homoglyph normalization, HTML link-text-href mismatch detection). PLUS a "Cleanup before next deploy" subheading with the 4 items from the V2 plan's Cleanup-Deferred subsection: Reply-To/Return-Path consolidation, shared VirusTotalClient, domain_of() helper, Add-on detectors-fired count duplication. Frame as "spotted and consciously deferred, not missed."
+  - Security posture: BOTH FRONTS framing (email-borne attackers + attackers targeting the product itself). Pull the bullet list from this HANDOVER.md's SECURITY-FIRST block (lines 17-21). Mention pip-audit run + clean security-review skill pass on this session.
+  - Tests: 186/186 passing. `pytest` from repo root.
+  - Tech stack: see CLAUDE.md "Tech Stack & Environment" - mostly current, double-check fastapi 0.136.1 / starlette 1.0.0 / python-dotenv 1.2.2 after the pip-audit bump.
+  - Acknowledgements: brief, deliberately Upwind-aligned ("applying Upwind's runtime-first / layered-detection philosophy to a new attack surface").
+
+Locked copy + voice rules for the README (non-negotiable):
+  - NO em-dashes. Plain ASCII hyphens only. Applies to every line of user-facing copy in the README.
+  - Use phrases from `docs/superpowers/specs/language-bank.md` verbatim where they fit.
+  - Frame Swellscan as *"applying Upwind's runtime-first / layered-detection philosophy to a new attack surface (email)"*. NEVER claim email is Upwind's domain; it isn't.
+  - Three deliberate stand-out moments are LOCKED at memory `project_demo_backbone.md`. DO NOT INVENT new moments.
+  - Scalability note required as the dedicated section per outline.
+  - Screenshots: reference `docs/screenshots/demo-N-<name>-<verdict>.png` (Lotan will capture these in a clean run before the README is finalized; the README writer references the paths but doesn't generate the images).
+
+After Task 34 lands: Task 35 (final CLAUDE.md refresh - small, mostly already done this session), Task 37 (PDF cover sheet - assignment requires PDF as the email attachment), Task 38 (submit to ou-bootcamp-interviewers@upwind.io with the repo URL + PDF + brief email body).
+
+Default skill: `superpowers:executing-plans`. Commit + push after every task. Hard-stop discipline after every task.
+
+Pre-rehearsal / pre-live-show function order (lives in `_demo_seed.gs` inside the Swellscan Apps Script project):
+  1. `clearSenderHistory()` - wipes any baseline state accumulated during testing. Does NOT delete emails.
+  2. `seedDemoHistory()` - restores Anthropic + orbitalvendor canonical seeds. Demo 1's swapped Google Cloud sender will show Variant 2 ("first email...identity checks out") on a fresh run, not Variant 1 - both are valid SAFE bodies.
+  3. Open demos 1 through 9 in order, each ONCE. Don't re-open within 5 min (cache TTL).
 
 Git authorship is already configured correctly. Commits should be authored as my personal identity WITHOUT a Co-Authored-By trailer (commits should look like my own work on GitHub).
 
