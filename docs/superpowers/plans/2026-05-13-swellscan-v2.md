@@ -1959,6 +1959,18 @@ These come from the research scan. The README's "Future Work" section copies the
 12. **Multi-persona / fake-thread-in-body detection** - Identify fabricated quoted-thread blocks inside one message body. Deferred because legitimate quoted threads create false-positive risk that requires careful handling.
 13. **Second LLM judge on output** - Run a second LLM call to fact-check the first's verdict against the evidence. Not pursued because Swellscan's scoring aggregator is already the deterministic judge; the LLM contributes evidence weights, not the final verdict.
 
+## Cleanup deferred from Task 31.5 (for README "before next production deploy" section)
+
+The Task 31.5 fresh-eyes code-review pass surfaced several real cleanup candidates that were deliberately deferred rather than landed on submission day. They are listed here so the reviewer can see they were spotted and consciously deferred, not missed. Each is the kind of thing that would be cleaned up before a real production deploy, but each carried enough risk that touching it on shipping day was the wrong trade-off. Task 34 surfaces these in the README under a "Cleanup before next deploy" heading so the reviewer sees the same call-out.
+
+1. **Consolidate the Reply-To and Return-Path branches in `headers.py`.** The two header-mismatch detector blocks are near-duplicates (~95 lines each). Same domain extraction, same severity ladder, same Evidence shape; the differences are an allowlist on Return-Path and the explanation strings. A parameterized helper would prevent a future fix to one from silently drifting from the other. Deferred because the blocks touch scoring-tier auth signals and Demo 6 (BEC thread-hijack) depends on this region; a refactor would need a parity test against every demo verdict before landing.
+
+2. **Share a single `VirusTotalClient` between the URL and attachment detectors.** Today each detector instantiates its own client and its own httpx connection pool. Both talk to the same VT host. One shared client (passed in via the existing dependency-injection constructor seams) would consolidate the pool and reduce per-request overhead. Deferred as low-importance compared to other shipping-day work.
+
+3. **Centralize email-domain extraction in a single `domain_of()` helper.** Five files extract the domain portion of an address with slightly different bracket-handling (`<addr@d.com>` vs `addr@d.com>` vs `addr@d.com`). The variations are functionally equivalent on legal inputs but are a latent inconsistency in security-relevant code. A shared helper would normalize them. Deferred because the touch surface (5 files) was wider than the shipping-day risk budget allowed.
+
+4. **Deduplicate the "detectors-fired" count between `Code.gs` and `render.gs` in the Add-on.** `Code.gs` walks the evidence list to count unique non-info detectors and attaches the result to the verdict before render; `render.gs` then either reads that cached value or re-derives it independently via the same loop. Pick one home (render.gs is the natural one). Deferred because Add-on changes can't be unit-tested locally and need a live Gmail re-test cycle.
+
 ## Limitations section (for README in Task 34)
 
 - **Multi-modal attacks** - Swellscan is email-only. Multi-channel attacks (deepfake voice + email phishing, video conference impersonation correlated with email) require correlation across products we do not integrate with. The 2024 Arup deepfake incident ($25M) is the canonical example.
