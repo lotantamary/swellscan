@@ -1,6 +1,6 @@
 import json
 
-from backend.clients.anthropic import AnthropicClient
+from backend.clients.anthropic import AnthropicClient, _sanitize_body
 from backend.detectors.base import Detector
 from backend.models.email import Email
 from backend.models.evidence import Evidence, Severity, Signal
@@ -18,11 +18,17 @@ class LLMDetector(Detector):
         evidence_json = json.dumps(
             [e.model_dump(mode="json") for e in prior_evidence]
         )
+        # Apply the V2 sanitization stack to the string fields the LLM will
+        # see in <email_metadata>. Without this, hidden-HTML / Unicode-Tags /
+        # closing-tag-mimic / zero-width / EchoLeak-markdown payloads embedded
+        # in subject or display_name would reach Claude un-sanitized while the
+        # body is sanitized - the V2 defense stack would be silently absent
+        # on the metadata path. Caught during Task 31.5 security review.
         metadata = json.dumps(
             {
                 "from_address": email.from_.address,
-                "display_name": email.from_.display_name,
-                "subject": email.subject,
+                "display_name": _sanitize_body(email.from_.display_name or ""),
+                "subject": _sanitize_body(email.subject or ""),
                 "urls_in_body": email.urls_in_body[:20],
                 "has_attachments": bool(email.attachments),
             }
