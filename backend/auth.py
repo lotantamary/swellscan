@@ -17,6 +17,20 @@ def _parse_audiences(raw: str) -> list[str]:
     return [a.strip() for a in raw.split(",") if a.strip()]
 
 
+# Parsed once at import - OIDC_AUDIENCE is configuration, not request data.
+# An empty list MUST fail loudly here: google-auth's verify_oauth2_token
+# skips the audience check entirely when passed an empty audience list, so
+# a misconfigured/blank OIDC_AUDIENCE would silently accept any valid
+# Google ID token (including tokens for unrelated apps). Fail at import so
+# the container refuses to start instead of running as an open-aud relay.
+_AUDIENCES: list[str] = _parse_audiences(config.OIDC_AUDIENCE)
+if not _AUDIENCES:
+    raise RuntimeError(
+        "OIDC_AUDIENCE is empty after parsing - refusing to start. An empty "
+        "audience list would disable OIDC audience verification entirely."
+    )
+
+
 async def verify_request(authorization: str = Header(...)) -> dict:
     """FastAPI dependency: verify Google OIDC ID token from Authorization header.
 
@@ -27,10 +41,9 @@ async def verify_request(authorization: str = Header(...)) -> dict:
     if not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing or malformed Authorization header")
     token = authorization.removeprefix("Bearer ").strip()
-    audiences = _parse_audiences(config.OIDC_AUDIENCE)
     try:
         payload = google_id_token.verify_oauth2_token(
-            token, GoogleRequest(), audience=audiences
+            token, GoogleRequest(), audience=_AUDIENCES
         )
     except ValueError as exc:
         log.warning("oidc_verification_failed", error=str(exc))
