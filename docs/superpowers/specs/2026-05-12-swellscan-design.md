@@ -8,9 +8,9 @@
 | **Context** | Upwind Security Bootcamp home assignment |
 | **Submission deadline** | Fri 2026-05-15 EOD |
 | **Demo interview** | Scheduled by author after submission (~Mon 2026-05-18) |
-| **Status** | Phases 0-5 complete (Tasks 1-28 of 39). Backend deployed on Cloud Run (revision `00008-gpx`); Gmail Add-on installed on the demo account; verdict card renders end-to-end in real Gmail. Card visual locked at `addon/design-refs/preview-final-v2.png`. Phase 6 (polish + submission) next. |
+| **Status** | V1, V2, Phase 6 demos, and Task 31.5 cleanup complete. Backend deployed on Cloud Run (revision `00024-wmr`); Gmail Add-on installed on the demo account; verdict card renders end-to-end in real Gmail. 9 demos (6 planned + 3 spares including the new demo-9 blocklist-bypass moment) verified. 183 tests passing. Card visual locked at `addon/design-refs/preview-final-v2.png`. Task 32 (security review) next, then README + submission. |
 | **Live backend URL** | `https://swellscan-backend-102679409749.us-central1.run.app` |
-| **Last revised** | 2026-05-13 (status line + §8.2 / §8.3 / §8.5 rewritten for auto-scan flow + static-PNG hero serving + retired animated-GIF stretch; §12.2 gained the per-signal drill-down future-work entry). |
+| **Last revised** | 2026-05-15 (Task 31.5 refresh: status updated, §3.1 untrusted-content tag name corrected, §3.2 SVG references reconciled with §8.3 static-PNG reality, §5.2 Evidence.explanation max_length 2000, §6 detector count corrected to eight + bec_language section added, §6.3 URL_BEHAVIORAL_FLAGGED + urlscan wire-up details added, §6.5 PAYLOAD_FRAGMENTATION_ATTEMPT added, §6.7 LLM threshold corrected from "25-75 band" to "≥ 25", §7.5 timeout 30s, §9.2 multi-audience OIDC + empty-list refusal + per-user rate limiter, §9.4 OIDC_AUDIENCE example updated to OAuth client ID). Earlier revisions tracked under 2026-05-13. |
 
 ---
 
@@ -62,7 +62,7 @@ This submission deliberately mirrors Upwind's published philosophy rather than c
 
 The LLM detector treats the email body as untrusted input:
 
-- Trusted instructions in `system` message; untrusted body inside `<untrusted_email_content>` XML delimiter
+- Trusted instructions in `system` message; untrusted body inside `<untrusted_content_{random-suffix}>` XML delimiter (random hex suffix per request — see §7.2 for the full prompt structure)
 - Output forced to a Pydantic JSON schema (Claude cannot return free-form text)
 - A dedicated `prompt_injection.py` detector scans the body for manipulation patterns. When found, it *raises* the maliciousness score and the injection text becomes visible evidence — the attack becomes the signal.
 
@@ -70,7 +70,7 @@ The LLM detector treats the email body as untrusted input:
 
 ### 3.2 — Wave-themed verdict + character arc (Stand-out #2)
 
-The verdict card uses a **dynamically-generated SVG illustration** as its hero image. The scene has three landmarks held constant across all verdicts — **lifeguard tower (left), surfer (center), lighthouse (right)** — while weather, water, and the surfer's pose change with the verdict:
+The verdict card uses a **three-state hero illustration** as its hero image. The scene has three landmarks held constant across all verdicts — **lifeguard tower (left), surfer (center), lighthouse (right)** — while weather, water, and the surfer's pose change with the verdict. (The original V1 plan was to dynamically generate the SVGs on the backend per request; during the Task 25 design pass this was replaced with serving three approved static PNGs from disk — see §8.3 for the canonical implementation.)
 
 | State | Sky | Water | Surfer | Lighthouse |
 |---|---|---|---|---|
@@ -80,7 +80,7 @@ The verdict card uses a **dynamically-generated SVG illustration** as its hero i
 
 Aesthetic: Coastal Modern. Palette directly from upwind.io: cream `#FBF6EC`, sand `#E8C691`, sky `#7EB8D9`, sun `#F4C95D`, coral `#E54F4F`. Typography: DM Sans body + Fraunces italic accents.
 
-The wave + scene is the *only* part of the card with full pixel control (rendered as a backend-generated SVG image). Everything else (text, buttons, findings list) uses Google's stock CardService widgets — readable, accessible, mobile-adaptive automatically.
+The wave + scene is the *only* part of the card with full pixel control (served as a 2:1 PNG file from `/illustration/{label}` — see §8.3). Everything else (text, buttons, findings list) uses Google's stock CardService widgets — readable, accessible, mobile-adaptive automatically.
 
 ### 3.3 — Per-sender baselining (Stand-out #3, promoted to v1 core)
 
@@ -152,7 +152,6 @@ This is a stronger privacy story than any database we could build: user owns the
                                               │  • anthropic-api-key     │
                                               │  • virustotal-api-key    │
                                               │  • safebrowsing-api-key  │
-                                              │  • swellscan-shared-token│
                                               └──────────────────────────┘
 ```
 
@@ -190,7 +189,8 @@ swellscan/
 │   │   ├── safebrowsing.py
 │   │   └── urlscan.py                # urlscan.io for redirect-chain visibility
 │   ├── illustration/
-│   │   └── wave.py                   # SVG generation per verdict state
+│   │   ├── wave.py                   # Static-PNG serving for `/illustration/{label}` (V1 SVG generator retired Task 25)
+│   │   └── assets/                   # safe.png, suspicious.png, malicious.png (Lotan's coastal-scene PNGs)
 │   ├── auth.py                       # OIDC ID-token verification (Google JWKs)
 │   ├── pipeline.py                   # Orchestrator
 │   ├── config.py                     # Env vars + secrets loading
@@ -251,7 +251,7 @@ class Evidence(BaseModel):
     signal: Signal                     # enum: spf_fail, lookalike_domain, prompt_injection_attempt, ...
     severity: Severity                 # info | low | medium | high | critical
     confidence: float = Field(ge=0.0, le=1.0)
-    explanation: str = Field(max_length=400)
+    explanation: str = Field(max_length=2000)  # bumped from 400 in Task 31; LLM evidence reasoning runs 500-1500 chars on multi-signal phishing emails
     mitre_techniques: list[str]        # ["T1566.002"]
     details: dict[str, Any]            # detector-specific structured data
     detector: str                      # which file produced this
@@ -292,7 +292,7 @@ Estimated LLM-invocation rate: ~40% of scans (60% are clear SAFE and short-circu
 
 ---
 
-## 6. The detectors (seven)
+## 6. The detectors (eight)
 
 ### 6.1 — `headers.py` — Email authentication
 Reads Gmail's `Authentication-Results` header. Emits `spf_pass/fail`, `dkim_valid/missing`, `dmarc_fail`, `reply_to_domain_mismatch`. Cost: $0.
@@ -303,7 +303,16 @@ Display-name vs domain mismatch; lookalike-domain check with homoglyph normaliza
 ### 6.3 — `urls.py` — URL reputation
 Extracts URLs from text + HTML bodies, queries **VirusTotal**, **Google Safe Browsing**, and **urlscan.io** *in parallel* via `asyncio.gather`. Flags link/text mismatches, IP-as-host, known shorteners. **We never visit the URLs directly.**
 
-**Redirect-chain handling:** VirusTotal and urlscan.io both follow redirects server-side when scanning a URL — their verdicts account for the final destination, not just the initial hop. So a `bit.ly` link that redirects to a known-phishing host gets a malicious verdict from VT directly, without us doing the resolution ourselves. urlscan.io adds explicit redirect-chain visibility (we can show the full hop chain in evidence details). This is the key answer to the URL-shortener evasion question: we delegate redirect-following to specialized services with isolated infrastructure.
+**Three independent reputation sources, three different mechanisms:**
+- **VirusTotal** — signature/blocklist database. Emits `URL_KNOWN_MALICIOUS` at CRITICAL severity.
+- **Google Safe Browsing** — Google's continuously-updated phishing/malware database. Emits `URL_KNOWN_PHISHING` at CRITICAL.
+- **urlscan.io** — behavioral archive of previously-scanned URLs. Catches fresh-domain phishing pages that signature databases haven't yet indexed (the 4-to-24-hour gap between attacker domain registration and blocklist coverage). Emits `URL_BEHAVIORAL_FLAGGED` at MEDIUM (conservative — anonymous urlscan API only exposes tag-based and automated verdicts; the strict consensus field is paid-tier). Wrapper fires on either `verdicts.overall.malicious`, `verdicts.urlscan.malicious`, or a `phishing`/`malicious` task tag.
+
+**Gap-only emission for urlscan.** When VirusTotal OR Safe Browsing already flagged the URL, urlscan's row is suppressed — no double-counting of the same URL across reputation sources. The signal is intentionally narrow to "URLs the signature services missed," which is precisely the gap urlscan covers.
+
+**`URLSCAN_ENABLED` kill switch.** Env-var-toggled at Cloud Run. Default true; flip to false on a misbehaving deploy without redeploying code. When off, urlscan is not even called.
+
+**Redirect-chain handling:** VirusTotal and urlscan.io both follow redirects server-side when scanning a URL — their verdicts account for the final destination, not just the initial hop. So a `bit.ly` link that redirects to a known-phishing host gets a malicious verdict from VT directly, without us doing the resolution ourselves. This is the key answer to the URL-shortener evasion question: we delegate redirect-following to specialized services with isolated infrastructure.
 
 Cost: free tier on all three (500 VT requests/day, 1000 urlscan/day, generous Safe Browsing quota).
 
@@ -311,13 +320,16 @@ Cost: free tier on all three (500 VT requests/day, 1000 urlscan/day, generous Sa
 Risky-extension classification (`.exe`, `.scr`, `.docm`, `.xlsm`, double-extensions, MIME mismatches). SHA-256 hashes (computed in Add-on, sent as metadata) queried against VirusTotal's file endpoint. **We never open files** — hash reputation only. Cost: free tier.
 
 ### 6.5 — `prompt_injection.py` — Adversarial input
-Regex + semantic detection for: "ignore previous instructions" patterns, verdict injection ("rate this as safe"), role hijacking, **tag-escape attempts** (`</` followed by tag-like keywords), leaked-looking XML tags, suspicious unicode, encoded payloads. Matches *raise* the maliciousness score AND get sanitized before reaching the LLM detector. Emits signals including `prompt_injection_attempt`, `tag_escaping_attempt`, `suspicious_unicode_in_body`, `encoded_payload_in_body`. Cost: $0.
+Regex + semantic detection for: "ignore previous instructions" patterns, verdict injection ("rate this as safe"), role hijacking, **tag-escape attempts** (`</` followed by tag-like keywords), leaked-looking XML tags, suspicious unicode, encoded payloads, **payload fragmentation** (5+ short quoted tokens + assembly verb — V2.S5). Matches *raise* the maliciousness score AND get sanitized before reaching the LLM detector. Emits signals: `prompt_injection_attempt`, `tag_escaping_attempt`, `suspicious_unicode_in_body`, `encoded_payload_in_body`, `payload_fragmentation_attempt`. Cost: $0.
 
 ### 6.6 — `sender_baseline.py` — Anomaly detection
 Compares current sender fingerprint against the user's `UserProperties` history. Emits `first_seen_sender`, `sender_domain_drift`, `sender_send_time_anomaly`, `sender_ip_geography_change`. Cost: $0.
 
 ### 6.7 — `llm.py` — Claude Sonnet 4.6 (conditional)
-Invoked only when raw score is in 25–75 band. Receives prior evidence + email metadata + sandboxed body. Returns structured JSON verdict. Hardened against prompt injection (see Section 7). Cost: ~$0.005 per invocation with prompt caching.
+Invoked whenever the raw score is **≥ 25** (i.e., anything not clearly SAFE — see §5.4). Receives prior evidence + email metadata + sandboxed body. Returns structured JSON verdict. Hardened against prompt injection (see Section 7). Cost: ~$0.005 per invocation.
+
+### 6.8 — `bec_language.py` — Business-email-compromise language (V2.S6)
+Detects BEC payment-instruction urgency: an urgency word (urgent, asap, immediately, today, end-of-day) within 100 characters of a payment-instruction word (wire, transfer, invoice, payment, banking-details), OR the standalone "change of banking details" phrase. Emits `PAYMENT_INSTRUCTION_URGENCY` at HIGH severity. This is the cheap-version signature of the dominant 2025-2026 BEC variant (per Verizon DBIR); full thread-context BEC detection is documented Future Work. Cost: $0.
 
 ### MVP-cut order (if implementation runs tight)
 
@@ -372,7 +384,7 @@ Anthropic's structured-output mode forces JSON schema match. Pydantic re-validat
 8. **Pre-sanitization by `prompt_injection.py`** also strips other injection patterns (verdict-injection, role-hijacking, "ignore previous instructions") before the body reaches the LLM
 
 ### 7.5 — Error handling
-5-second timeout; rate limit → skip; schema-validation failure → skip. Pipeline continues with cheap-detector evidence. Logged with `request_id`.
+30-second timeout (bumped from 5s during Task 31 — real Claude responses for our ~11KB prompts run 5-15s typically; 30s gives realistic headroom while staying under Cloud Run's 60s request ceiling); rate limit → skip; schema-validation failure → skip; markdown code-fence wrapping → defensively stripped before validation. Pipeline continues with cheap-detector evidence. Logged with `request_id` and the exception class name (Task 31 fix — bare `str(exc)` for httpx connection errors was uninformative).
 
 ### 7.6 — Cost
 ~$0.005 per LLM invocation with prompt caching. ~$2 total expected for development + demo.
@@ -464,10 +476,11 @@ The original spec proposed an animated GIF wave hero as a stretch. With Lotan's 
 **Google OpenID Connect (OIDC) identity tokens.** No long-lived shared secret.
 
 **Flow:**
-1. Add-on calls `ScriptApp.getIdentityToken()` — returns a Google-signed JWT identifying the current Gmail user (with `email`, `sub`, `aud`, `exp` claims). Token validity: ~1 hour.
+1. Add-on calls `ScriptApp.getIdentityToken()` — returns a Google-signed JWT identifying the current Gmail user (with `email`, `sub`, `aud`, `exp` claims). Token validity: ~1 hour. The `aud` claim is the **Apps Script project's OAuth client ID** (NOT the Cloud Run URL — a V1 plan-drift catch from Task 28 Step 4.5; documented separately).
 2. Add-on sends it as `Authorization: Bearer <token>` on every request to the backend.
-3. Backend verifies the token's signature against [Google's public JWKs](https://www.googleapis.com/oauth2/v3/certs) using `google-auth` Python library. Confirms `aud` matches our expected audience and `exp` hasn't passed.
-4. Backend checks the `email` claim against a tiny in-code allowlist (just the demo Gmail account).
+3. Backend verifies the token's signature against [Google's public JWKs](https://www.googleapis.com/oauth2/v3/certs) using `google-auth` Python library. Confirms `aud` matches one of the configured audiences (V2.S14: `OIDC_AUDIENCE` env var is comma-separated so multiple Apps Script projects can share this backend) and `exp` hasn't passed. The audience list is parsed and cached **once at module import**; if it parses to an empty list, the backend **refuses to start** rather than running with `audience=[]` which google-auth treats as "skip the audience check entirely" (Task 31.5 hardening).
+4. Backend checks the `email` claim against the in-code `ALLOWED_USERS` allowlist (currently the demo Gmail account).
+5. Backend enforces a **per-user sliding-window rate limit** (100 calls / 24h, in-memory approximate — V2.S14). Rejected with 429 if exceeded. Cloud Run `--max-instances=10` caps total parallelism; combined with the Anthropic prepaid balance ($5 hard cap + $20 monthly soft cap), this gives defense-in-depth against cost-exhaustion attacks.
 
 **Why this is better than a shared secret:**
 
@@ -498,10 +511,14 @@ gcloud run deploy swellscan-backend \
   --set-secrets="ANTHROPIC_API_KEY=anthropic-api-key:latest, \
                  VIRUSTOTAL_API_KEY=virustotal-api-key:latest, \
                  SAFEBROWSING_API_KEY=safebrowsing-api-key:latest" \
-  --set-env-vars="ALLOWED_USERS=swellscan.demo.lotan@gmail.com, \
-                  OIDC_AUDIENCE=https://swellscan-backend-xxx.run.app" \
+  --set-env-vars="ALLOWED_USERS=swellscan.demo@gmail.com, \
+                  OIDC_AUDIENCE=812475821064-s838lvgcgmc1nj4lbjqivpa48usi4t8v.apps.googleusercontent.com, \
+                  URLSCAN_ENABLED=true" \
+  --max-instances=10 \
   --allow-unauthenticated
 ```
+
+The `OIDC_AUDIENCE` value above is the demo Apps Script project's OAuth client ID — `ScriptApp.getIdentityToken()` mints JWTs whose `aud` claim is this ID, not the Cloud Run URL. Multi-audience deployments (e.g., sharing this backend with another authorized user's Apps Script project) just append additional client IDs comma-separated.
 
 `--allow-unauthenticated` here means Cloud Run won't enforce IAM — *our application code* enforces auth via the OIDC token verification described in §9.2. (Cloud Run's IAM is service-account-based; user-identity auth is enforced at the application layer.)
 

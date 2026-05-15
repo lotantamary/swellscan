@@ -4,9 +4,11 @@ Swellscan is a Gmail Add-on that analyzes the currently-open email and produces 
 
 The design deliberately mirrors Upwind's own published architecture (RSAC 2026 malicious-prompt detector): three threat-class coverage areas (phishing-links, BEC, attachments) plus three deliberate stand-out moments — self-defending LLM, wave-themed verdict card with a character arc, and per-sender baselining. Submission deadline: **Fri 2026-05-15 EOD**.
 
-## Current State (updated 2026-05-15, Tasks 29-31 complete - demos validated end-to-end)
+## Current State (updated 2026-05-15, Task 31.5 complete - cleanup + urlscan wire-up + demo 9)
 
-**V1, V2, and Phase 6 demo validation (Tasks 29-31) ALL complete and deployed.** 6 planned demos + 2 spares verified end-to-end with submission-quality screenshots. Live revision `swellscan-backend-00022-bsr` (2026-05-15). 167 tests passing (was 136). Phase 6 continues at Task 31.5 (cleanup + code-review + simplify with fresh eyes) → Task 32 (security review) → Task 34 (README full content - **creativity emphasis**) → Task 35 (refresh CLAUDE.md) → Task 37 (PDF cover sheet) → Task 38 (submit). Submission deadline TODAY EOD.
+**V1, V2, Phase 6 demos, AND Task 31.5 cleanup ALL complete and deployed.** 6 planned demos + 3 spares (demos 7, 8, 9) verified end-to-end with submission-quality screenshots. Live revision `swellscan-backend-00024-wmr` (2026-05-15). 183 tests passing (was 167). Phase 6 continues at Task 32 (security review) → Task 34 (README full content - **creativity emphasis**) → Task 35 (refresh CLAUDE.md) → Task 37 (PDF cover sheet) → Task 38 (submit). Submission deadline TODAY EOD.
+
+**Task 31.5 surfaced ~17 cleanup candidates across two parallel review skills (simplify + code-review); 7 landed today as Tier 1 + Tier 2, 4 deferred to README backlog with explicit "would do before next production deploy" framing. Also: the design doc promised 3 URL-reputation sources but the code only wired 2 - the urlscan wire-up closes that plan-drift, and the urlscan wrapper picked up two real bug fixes (URL-encoding hardening + the page.url query-format quote-wrapping) while being relaxed to fire on urlscan's tag-based verdicts (the strict consensus field is paid-tier only).**
 
 **Task 31 dogfood pass surfaced 12 plan-drift catches** (interview material - all fixed and committed):
 1. Empty-baseline drift false-positive on real Gmail emails
@@ -23,10 +25,10 @@ The design deliberately mirrors Upwind's own published architecture (RSAC 2026 m
 12. Demo 6 body had urgency >100 chars from any payment word AND prompt-injection regex missed "Ignore all previous instructions" + "as verdict=benign" phrasings - both fixed
 
 - **Live URL:** [`https://swellscan-backend-102679409749.us-central1.run.app`](https://swellscan-backend-102679409749.us-central1.run.app/health) - `/health` returns `{"status":"ok"}`, `/score` is OIDC-protected (401 without a valid Google ID token), `/illustration/{label}` serves the static hero PNG (SAFE/SUSPICIOUS/MALICIOUS), `/dot/{severity}` serves the severity-dot icon, `/logo.png` serves the Swellscan brand logo. All static endpoints carry a 1-hour cache.
-- **Live revision:** `swellscan-backend-00022-bsr` (Task 31 final - prompt-injection regex broadening).
-- **Tests:** **167 passing** (53 V1 + 83 V2 + 31 Task 31 regressions). `pytest` from repo root runs all.
-- **Detectors (8 total, was 7 in V1):** headers, sender, urls, attachments, prompt-injection, sender-baseline, llm, **plus new V2 detector `bec_language`** (payment-instruction-urgency BEC defense).
-- **New signals in V2 (3):** `PAYLOAD_FRAGMENTATION_ATTEMPT` (prompt-injection), `PAYMENT_INSTRUCTION_URGENCY` (bec_language), `RETURN_PATH_DOMAIN_MISMATCH` (headers). Also wired up the previously-dormant `ATTACHMENT_PASSWORD_PROTECTED_ARCHIVE` enum to a real detection rule.
+- **Live revision:** `swellscan-backend-00024-wmr` (Task 31.5 final - urlscan wire-up + relaxation + query-format fix + demo 9 builder; Tier 1 + Tier 2 cleanup landed first).
+- **Tests:** **183 passing** (53 V1 + 83 V2 + 31 Task 31 regressions + 5 Task 31.5 urlscan-detector tests + 11 urlscan client tests). `pytest` from repo root runs all.
+- **Detectors (8 total, was 7 in V1):** headers, sender, urls, attachments, prompt-injection, sender-baseline, llm, **plus V2 detector `bec_language`** (payment-instruction-urgency BEC defense).
+- **New signals in V2 + Task 31.5 (4):** `PAYLOAD_FRAGMENTATION_ATTEMPT` (prompt-injection, V2.S5), `PAYMENT_INSTRUCTION_URGENCY` (bec_language, V2.S6), `RETURN_PATH_DOMAIN_MISMATCH` (headers, V2.S3b), `URL_BEHAVIORAL_FLAGGED` (urls, Task 31.5). Also wired up the previously-dormant `ATTACHMENT_PASSWORD_PROTECTED_ARCHIVE` enum to a real detection rule.
 - **Three signature features built and verified end-to-end:**
   1. **Self-defending LLM** - Task 10 prompt-injection detector + Task 14 hardened Anthropic client + V2.S2 defense-in-depth sanitization layer (hidden HTML strip, Unicode Tags block U+E0000-U+E007F strip, markdown image / reference-link strip, global zero-width strip, closing-tag-mimic neutralization)
   2. **Layered detection with correlation engine** - Task 15 pipeline + Task 4 thresholds + V2.S7 correlation rules (4 attacker-playbook bonuses: credential-harvesting trio, AI-targeted, impersonation, thread-hijack signature)
@@ -34,7 +36,7 @@ The design deliberately mirrors Upwind's own published architecture (RSAC 2026 m
 - **GCP project:** `swellscan-prod` (project number `102679409749`), owned by `swellscan.demo@gmail.com`, billing on free trial. Three secrets in Secret Manager.
 - **OIDC_AUDIENCE** (updated 2026-05-13 during Task 28 Step 4.5): `812475821064-s838lvgcgmc1nj4lbjqivpa48usi4t8v.apps.googleusercontent.com` - the Apps Script project's OAuth client ID, NOT the Cloud Run URL.
 - **Card visual is LOCKED:** canonical mockup at `addon/design-refs/preview-final-v2.png`. Live card in Gmail matches. The verdict-card BODY is now LLM-generated for SUSPICIOUS/MALICIOUS (V2.S8 prompt synthesizes multiple signals into one flowing sentence) and 4-variant templated for SAFE (V2.S12: relationship + auth, new-sender + auth, minor-findings-present, truly-clean).
-- **What's next:** **Phase 6 Task 29** (pre-seed demo Gmail's UserProperties for per-sender-baseline). Then Task 30 (craft 5 demo emails) → 31 (manual end-to-end test + screenshots) → 31.5 (cleanup + code-review) → 32 (pip-audit + security-review) → 34 (README) → 35 (CLAUDE.md refresh) → 37 (PDF cover) → 38 (submit email) → 39 (handoff). Submission deadline Fri 2026-05-15 EOD.
+- **What's next:** **Phase 6 Task 32** (pip-audit + security-review skill pass, both fronts of security posture). Then Task 34 (README) → Task 35 (CLAUDE.md final refresh) → Task 37 (PDF cover) → Task 38 (submit email) → Task 39 (handoff). Submission deadline Fri 2026-05-15 EOD.
 
 For the full deployment-state reference (URLs, IAM, env vars, the bugs we found at deploy time, cleanup commands at end-of-project), see the `project_deploy_state.md` memory file.
 
@@ -90,6 +92,22 @@ For the full deployment-state reference (URLs, IAM, env vars, the bugs we found 
 | V2.S12 | `e602dc6` | Four-variant SAFE body templates (relationship+auth-pass, new-sender+auth-pass, minor-findings, truly-clean) - replaces single static SAFE template; Option B priority (relationship wins over minor-findings when both match) |
 | V2.S13 deploy | (revision `00011-bpj`) | Single deploy covering V2.S12 |
 | V2.S14 | `cd8a79a` | Multi-audience OIDC support (`OIDC_AUDIENCE` env var now comma-separated) + per-user rate limiter (100 calls / 24h sliding window via `backend/rate_limit.py`, in-memory approximate, wired into `verify_request` after the allowlist check) + Cloud Run `--max-instances=10` flag. Unblocks Path A install in README (other Apps Script projects can share this backend). Defense-in-depth combo: Anthropic prepaid $5 balance (hard cap) + monthly limit $20 + per-user rate limit + max-instances. Live revision `00012-nhf`. |
+
+**Task 31.5 commits (Tier 1 + Tier 2 cleanup, urlscan wire-up, demo 9):**
+
+| Task 31.5 step | Commit | What |
+|---|---|---|
+| Tier 1 #1 | `c8f6e74` | Shared security-pattern module - `backend/_security_patterns.py` becomes the single source of truth for the closing-tag-mimic regex and the zero-width-character regex. Both prompt_injection detector and the LLM client sanitizer import from there, enforcing the "sanitizer strips what detector flags" contract by construction. |
+| Tier 1 #2 | `07680b8` | Unified FREEMAIL set - the headers detector and the sender detector held two divergent freemail-domain sets (one had 8 entries, one had 6) with an explicit TODO to consolidate. Moved canonical superset to `backend/_freemail.py` as a frozenset; both detectors import from there. |
+| Tier 1 #3 | `3731178` | OIDC audience cache + empty-list refusal at import - the audience env var is parsed once at module load instead of every request, AND the container now refuses to start if `OIDC_AUDIENCE` parses to an empty list (google-auth's `verify_oauth2_token(audience=[])` silently skips the audience check - so a misconfigured/blank env var would have turned the backend into an open relay). |
+| Tier 1 #4a | `44bcad4` | urlscan wired up as the third URL-reputation source (closes a four-document plan-drift: design doc / V1 plan prose / V2 plan limitations all claimed 3 sources, V1 plan code block reserved the client slot but never called `search_existing()` in run()). Conservative MEDIUM/0.7 weighting, gap-only emission (suppressed when VT or SB already flagged the URL), `URLSCAN_ENABLED` env-var kill switch, URL-encoding hardening, structured failure logging. |
+| Tier 1 #4b | `c383a4c` | urlscan wrapper relaxed - anonymous urlscan API returns empty `verdicts` blob (strict consensus field is paid-tier); wrapper now also fires on urlscan's automated verdict OR `phishing`/`malicious` task tags. Downstream noise bounded by the conservative scoring + gap-only emission. |
+| Tier 1 #4c | `86bbf2a` | urlscan query-format bug fix - the wrapper queried `page.url:https://...` which urlscan's parser interpreted as `page.url:https` plus junk, matching no scans even when the URL was indexed. Wrap URL in double quotes inside the query so colons in `https://` stay part of the value. Real production bug, only surfaced because we tried to verify a known-indexed URL by hand. |
+| Tier 2 #5 | `be7bedb` | Score + label computed once per request - was computed three times (LLM-gate, body-builder branch, build_verdict). Pipeline.run now passes precomputed `score` and `label` into both `_summarize` and `build_verdict`. Closes a drift surface for future scoring-policy tweaks. |
+| Tier 2 #6 | `5d41526` | `LLMDetector.name` constant replaces `"llm"` string literal in api/score.py log line. The `pipeline.py` `== "SAFE"` was already replaced with `VerdictLabel.SAFE` during the score-once refactor. |
+| Tier 2 #7 | `cd3f0d4` | `max()` replaces `sorted()[0]` for top-evidence selection - one-pass instead of full sort. |
+| Demo 9 | `61c0ff5` | Demo 9 (blocklist-bypass / fresh-domain phishing URL). Clean vendor-quote email; only signal is URL_BEHAVIORAL_FLAGGED. SAFE label with a single MEDIUM finding - demonstrates the nuanced "signal-over-noise" verdict layer rather than binary classification. |
+| Cleanup backlog | `d8e749a` | V2 plan now contains the explicit "Cleanup deferred from Task 31.5 (before next production deploy)" subsection with the 4 items the README's Future Work section surfaces under that heading (header detector consolidation, shared VirusTotalClient, domain_of helper, Add-on detectors-fired count duplication). |
 
 **Plan-vs-implementation drift caught (interview material):**
 
