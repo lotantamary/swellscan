@@ -50,5 +50,5 @@ CLAUDE.md
 # --- Demo plumbing (local-only seed + inbox-injector helpers) ---
 demo-plumbing/
 
-# --- Internal implementation plans (working notes; specs/ stays public) ---
-docs/superpowers/plans/
+# --- Internal docs (design notes, plans, language bank; kept local) ---
+docs/superpowers/

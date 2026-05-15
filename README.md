@@ -332,6 +332,6 @@ Unit tests live at [`tests/unit/`](tests/unit/) (one file per detector, plus sco
 
 The assignment was intentionally open-ended; this submission's framing is to apply Upwind's published runtime-first / layered-detection philosophy to a new attack surface that Upwind itself does not address (email). Vocabulary and patterns are deliberately mirrored: layered detection, signal over noise, evidence-based scoring, prioritized response based on real attacker behavior, MITRE ATT&CK technique mapping on every finding.
 
-The full design lives in [`docs/superpowers/specs/2026-05-12-swellscan-design.md`](docs/superpowers/specs/2026-05-12-swellscan-design.md). The locked Upwind-aligned vocabulary is at [`docs/superpowers/specs/language-bank.md`](docs/superpowers/specs/language-bank.md). References that shaped the architecture: the [Upwind RSAC 2026 announcement on layered malicious-AI-prompt detection](https://www.businesswire.com/news/home/20260323142408/), the [MITRE ATT&CK Phishing technique tree](https://attack.mitre.org/techniques/T1566/), the Verizon 2025 DBIR on BEC payment-instruction trends, and KnowBe4's 2025 risky-attachment data.
+References that shaped the architecture: the [Upwind RSAC 2026 announcement on layered malicious-AI-prompt detection](https://www.businesswire.com/news/home/20260323142408/), the [MITRE ATT&CK Phishing technique tree](https://attack.mitre.org/techniques/T1566/), the Verizon 2025 DBIR on BEC payment-instruction trends, and KnowBe4's 2025 risky-attachment data.
 
 Thank you for the room to build something opinionated.
