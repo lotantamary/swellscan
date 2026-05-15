@@ -1,5 +1,6 @@
 import re
 
+from backend._security_patterns import CLOSING_TAG_MIMIC, ZERO_WIDTH
 from backend.detectors.base import Detector
 from backend.models.email import Email
 from backend.models.evidence import Evidence, Severity, Signal
@@ -30,16 +31,6 @@ INJECTION_PATTERNS = [
     re.compile(r"you\s+are\s+now\s+(?:a|an)\b", re.I),
     re.compile(r"\b(?:act|pretend)\s+as\s+(?:a|an)", re.I),
 ]
-TAG_ESCAPE_PATTERN = re.compile(
-    r"</(?:untrusted|system|instruction|prompt|evidence|email)[a-z_0-9]*>",
-    re.I,
-)
-# Zero-width / invisible Unicode points commonly abused for evasion.
-# The character class below contains, in order:
-#   U+200B zero-width space, U+200C zero-width non-joiner,
-#   U+200D zero-width joiner, U+2060 word joiner, U+FEFF byte-order mark.
-# Each is intentionally invisible in editors - see the codepoint comment above.
-ZERO_WIDTH_PATTERN = re.compile("[​‌‍⁠﻿]")
 BASE64_BLOB_PATTERN = re.compile(r"[A-Za-z0-9+/]{80,}={0,2}")
 
 # Strip http(s):// URLs AND data: URIs from the body before checking for
@@ -93,7 +84,7 @@ class PromptInjectionDetector(Detector):
                 )
             )
 
-        tag_match = TAG_ESCAPE_PATTERN.search(body)
+        tag_match = CLOSING_TAG_MIMIC.search(body)
         if tag_match:
             out.append(
                 Evidence(
@@ -107,7 +98,7 @@ class PromptInjectionDetector(Detector):
                 )
             )
 
-        if ZERO_WIDTH_PATTERN.search(body):
+        if ZERO_WIDTH.search(body):
             out.append(
                 Evidence(
                     signal=Signal.SUSPICIOUS_UNICODE_IN_BODY,

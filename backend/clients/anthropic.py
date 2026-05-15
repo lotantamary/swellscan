@@ -5,6 +5,7 @@ import structlog
 from anthropic import AsyncAnthropic
 from pydantic import BaseModel, Field
 
+from backend._security_patterns import CLOSING_TAG_MIMIC, ZERO_WIDTH
 from backend.config import config
 
 log = structlog.get_logger()
@@ -27,15 +28,9 @@ class LLMVerdict(BaseModel):
 # V2.S2 defense-in-depth sanitization. Applied in order before the body
 # reaches Claude. The prompt-injection detector still runs against the
 # ORIGINAL body and emits signals like SUSPICIOUS_UNICODE_IN_BODY; this
-# function strips those same patterns from the LLM-visible content.
-
-# Closing-tag mimics. V1 inserted zero-width chars between '<' and '/'; V2
-# strips zero-width chars globally, which would undo that protection. New
-# strategy: remove closing-tag-mimic sequences entirely.
-_CLOSING_TAG_MIMIC = re.compile(
-    r"</(?:untrusted|system|instruction|prompt|evidence|email)[a-z0-9_]*>",
-    flags=re.I,
-)
+# function strips those same patterns from the LLM-visible content. The
+# CLOSING_TAG_MIMIC and ZERO_WIDTH patterns are shared with the detector
+# via backend/_security_patterns.py to enforce the contract by construction.
 
 # CSS-hidden HTML: strip element-and-contents when the style attribute hides it.
 # Pragmatic regex, not a full HTML parser. Catches display:none, font-size:0,
@@ -56,12 +51,6 @@ _MARKDOWN_REF_DEF = re.compile(r"^\s*\[[^\]]+\]:\s*\S+.*$", flags=re.M)
 # (Cisco research 2025; MITRE T1027.018 sub-technique).
 _UNICODE_TAGS = re.compile(r"[\U000E0000-\U000E007F]")
 
-# Zero-width and invisible chars. V1 only inserted these as part of the
-# closing-tag escape; V2 strips them globally.
-# U+200B zero-width space, U+200C zero-width non-joiner, U+200D zero-width
-# joiner, U+2060 word joiner, U+FEFF byte-order mark.
-_ZERO_WIDTH = re.compile("[​‌‍⁠﻿]")
-
 
 def _sanitize_body(body: str) -> str:
     """Apply V2 defense-in-depth sanitization before passing body to the LLM.
@@ -76,8 +65,8 @@ def _sanitize_body(body: str) -> str:
     body = _MARKDOWN_REF_LINK.sub("", body)
     body = _MARKDOWN_REF_DEF.sub("", body)
     body = _UNICODE_TAGS.sub("", body)
-    body = _ZERO_WIDTH.sub("", body)
-    body = _CLOSING_TAG_MIMIC.sub("[removed]", body)
+    body = ZERO_WIDTH.sub("", body)
+    body = CLOSING_TAG_MIMIC.sub("[removed]", body)
     return body
 
 
