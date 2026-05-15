@@ -324,7 +324,7 @@ Locked copy + voice rules for the README (non-negotiable):
   - Frame Swellscan as *"applying Upwind's runtime-first / layered-detection philosophy to a new attack surface (email)"*. NEVER claim email is Upwind's domain; it isn't.
   - Three deliberate stand-out moments are LOCKED at memory `project_demo_backbone.md`. DO NOT INVENT new moments.
   - Scalability note required as the dedicated section per outline.
-  - Screenshots already uploaded to `docs/superpowers/screenshots/`. 12 files total: 9 demo cards (`demo-1-google-cloud-safe.png` through `demo-9-blocklist-bypass-safe.png`) plus 3 generic card-type images (`SAFE-CARD.png`, `suspicious-card.png`, `malicious-card.png`) for the "three deliberate design choices" section's character-arc illustration. Reference them inline in the README markdown: `![demo 1 - SAFE](docs/superpowers/screenshots/demo-1-google-cloud-safe.png)`. They render automatically on GitHub when Bar Naor views the repo.
+  - Screenshots already uploaded to `docs/screenshots/`. 12 files total: 9 demo cards (`demo-1-google-cloud-safe.png` through `demo-9-blocklist-bypass-safe.png`) plus 3 generic card-type images (`SAFE-CARD.png`, `suspicious-card.png`, `malicious-card.png`) for the "three deliberate design choices" section's character-arc illustration. Reference them inline in the README markdown: `![demo 1 - SAFE](docs/screenshots/demo-1-google-cloud-safe.png)`. They render automatically on GitHub when Bar Naor views the repo.
 
 After Task 34 lands: Task 35 (final CLAUDE.md refresh - small, mostly already done this session), Task 37 (PDF cover sheet - assignment requires PDF as the email attachment), Task 38 (submit to ou-bootcamp-interviewers@upwind.io with the repo URL + PDF + brief email body).
 
