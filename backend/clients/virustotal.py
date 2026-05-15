@@ -36,10 +36,16 @@ class VirusTotalClient:
                 "categories": list(data.get("categories", {}).values()),
             }
         except (httpx.HTTPError, httpx.TimeoutException) as exc:
+            # Task 31.5 security-review hardening: consistent with the
+            # safebrowsing client - drop error=str(exc) since httpx
+            # exception __str__ can include the request URL, and even
+            # though VT auth lives in a header (x-apikey) rather than the
+            # URL, the consistent pattern is safer to maintain than to
+            # remember which client is which.
             log.warning(
                 "virustotal_url_lookup_failed",
-                error=str(exc),
                 error_type=type(exc).__name__,
+                status=getattr(getattr(exc, "response", None), "status_code", None),
             )
             return {"found": False, "error": "vt_request_failed"}
 
@@ -62,7 +68,7 @@ class VirusTotalClient:
         except (httpx.HTTPError, httpx.TimeoutException) as exc:
             log.warning(
                 "virustotal_hash_lookup_failed",
-                error=str(exc),
                 error_type=type(exc).__name__,
+                status=getattr(getattr(exc, "response", None), "status_code", None),
             )
             return {"found": False, "error": "vt_request_failed"}

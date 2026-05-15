@@ -43,10 +43,16 @@ class SafeBrowsingClient:
         except (httpx.HTTPError, httpx.TimeoutException) as exc:
             # Task 31 fix: previously swallowed silently. Log the failure
             # mode so we can diagnose if URL signals stop firing.
+            # Task 31.5 security-review hardening: drop error=str(exc).
+            # Safe Browsing's v4 API requires the API key as a URL query
+            # parameter (?key=...), and httpx exception __str__ can include
+            # the request URL with the key inline. Logging error_type plus
+            # the response status code (when available) is sufficient for
+            # diagnosis without ever shipping the key into Cloud Logging.
             log.warning(
                 "safebrowsing_lookup_failed",
-                error=str(exc),
                 error_type=type(exc).__name__,
+                status=getattr(getattr(exc, "response", None), "status_code", None),
                 url_count=len(urls),
             )
             return set()
