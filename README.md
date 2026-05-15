@@ -1,4 +1,7 @@
-# Swellscan
+<h1>
+  <img src="backend/illustration/assets/logo.png" alt="Swellscan logo" height="56" align="center" />
+  &nbsp;Swellscan
+</h1>
 
 > Every inbox is a shore. We scan every swell that hits it.
 
