@@ -20,6 +20,31 @@ function onGmailMessageOpen(e) {
   const messageId = e.gmail.messageId;
   const accessToken = e.gmail.accessToken;
   try {
+    // Phantom-trigger guard. Gmail's Add-on framework occasionally invokes
+    // onGmailMessageOpen twice for a single user open. The first scan trains
+    // the per-sender baseline on the observed signals (the architecture's
+    // intentional learning step - documented as Future Work to move under
+    // user control). The second scan, 1-3 seconds later, then reads the
+    // now-polluted baseline and returns a degraded verdict. The framework
+    // renders the second response, overwriting the correct first card.
+    //
+    // Cache the first verdict per message_id. A phantom re-invocation
+    // within 5 minutes returns the cached card directly and skips both the
+    // backend call AND the baseline update (already done by the first
+    // call - baseline.gs's message_id ring-buffer would no-op anyway).
+    // 5-minute TTL covers a live demo session and expires naturally.
+    const cache = CacheService.getUserCache();
+    const cacheKey = 'verdict:' + messageId;
+    const cachedVerdictJson = cache.get(cacheKey);
+    if (cachedVerdictJson) {
+      try {
+        const cachedVerdict = JSON.parse(cachedVerdictJson);
+        return [buildVerdictCard(cachedVerdict)];
+      } catch (parseErr) {
+        // Cache entry corrupt - fall through to a fresh scan.
+      }
+    }
+
     const payload = buildEmailPayload(messageId, accessToken);
     const verdict = callBackend(payload);
 
@@ -30,6 +55,20 @@ function onGmailMessageOpen(e) {
     // problem the detectors call it out in a specific finding row.
     verdict.detectors_fired = countDetectorsFired(verdict.evidence);
     verdict.llm_invoked = (verdict.detectors_run || []).indexOf('llm') !== -1;
+
+    // Cache the verdict (including the presentation fields above) so a
+    // phantom re-invocation rendering from cache produces the identical
+    // card. CacheService.put with TTL in seconds; 300 = 5 minutes.
+    try {
+      cache.put(cacheKey, JSON.stringify(verdict), 300);
+    } catch (cacheErr) {
+      // CacheService can throw if value is over the per-key size limit
+      // (~100KB). Verdicts are typically a few KB; if a future LLM
+      // response inflates one beyond the cap, fail silently so the user
+      // still sees a card. The phantom-overwrite bug returns, but
+      // worst-case the user sees a slightly-wrong second scan rather
+      // than a hard error.
+    }
 
     // Sender baseline update. baseline.gs (Task 27) handles message_id
     // idempotency. typeof-guarded so Code.gs ships cleanly even if
