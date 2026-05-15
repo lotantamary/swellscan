@@ -23,6 +23,10 @@ class Config:
     VIRUSTOTAL_API_KEY: str = _strip(os.environ["VIRUSTOTAL_API_KEY"])
     SAFEBROWSING_API_KEY: str = _strip(os.environ["SAFEBROWSING_API_KEY"])
     URLSCAN_API_KEY: str = _strip(os.environ.get("URLSCAN_API_KEY", ""))
+    # Kill switch for the third URL-reputation source. Default true; flip
+    # to "false" on Cloud Run without a code change if urlscan misbehaves
+    # at demo time.
+    URLSCAN_ENABLED: bool = _strip(os.environ.get("URLSCAN_ENABLED", "true")).lower() in ("true", "1", "yes")
     ALLOWED_USERS: set[str] = {u.strip() for u in os.environ["ALLOWED_USERS"].split(",") if u.strip()}
     OIDC_AUDIENCE: str = _strip(os.environ["OIDC_AUDIENCE"])
     LOG_LEVEL: str = _strip(os.environ.get("LOG_LEVEL", "INFO"))

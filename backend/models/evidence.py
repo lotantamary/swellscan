@@ -31,6 +31,7 @@ class Signal(StrEnum):
     # urls
     URL_KNOWN_MALICIOUS = "url_known_malicious"
     URL_KNOWN_PHISHING = "url_known_phishing"
+    URL_BEHAVIORAL_FLAGGED = "url_behavioral_flagged"
     URL_TEXT_HREF_MISMATCH = "url_text_href_mismatch"
     URL_USES_IP_NOT_DOMAIN = "url_uses_ip_not_domain"
     URL_SHORTENER = "url_shortener"
