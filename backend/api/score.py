@@ -2,6 +2,7 @@ import structlog
 from fastapi import APIRouter, Depends
 
 from backend.auth import verify_request
+from backend.detectors.llm import LLMDetector
 from backend.models.email import Email
 from backend.models.verdict import Verdict
 from backend.pipeline import Pipeline
@@ -22,7 +23,7 @@ async def score(email: Email, user=Depends(verify_request)) -> Verdict:
         verdict=verdict.label,
         detectors_run=verdict.detectors_run,
         latency_ms=verdict.latency_ms,
-        llm_invoked="llm" in verdict.detectors_run,
+        llm_invoked=LLMDetector.name in verdict.detectors_run,
         user=user.get("email"),
     )
     return verdict
