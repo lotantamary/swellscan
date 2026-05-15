@@ -10,10 +10,16 @@ log = structlog.get_logger()
 
 class UrlscanClient:
     BASE = "https://urlscan.io/api/v1"
-    # Kept tight on purpose: urlscan is the cushion-tier reputation source.
-    # If it slows us down it should fail fast and let the verdict ship on
-    # VirusTotal + Safe Browsing alone.
-    TIMEOUT = 4.0
+    # Aligned with the other two reputation clients (VT, Safe Browsing both
+    # at 15s). The previous 4s value was "cushion-tier fail-fast" theory but
+    # the practical reality from Cloud Run is that urlscan's anonymous-tier
+    # response latency regularly exceeds 4s, causing ReadTimeout on every
+    # demo scan and silently swallowing the URL_BEHAVIORAL_FLAGGED signal.
+    # Caught when demo 9 surfaced 0 findings on the live verification scan
+    # while urlscan responded normally to the same URL from local machines.
+    # The call still runs in parallel with VT/SB so worst-case latency
+    # stays bounded at max(VT, SB, urlscan) <= 15s.
+    TIMEOUT = 15.0
 
     def __init__(self, http_client: httpx.AsyncClient | None = None):
         self._http = http_client or httpx.AsyncClient(timeout=self.TIMEOUT)
