@@ -60,10 +60,17 @@ def build_verdict(
     detectors_run: list[str],
     latency_ms: int,
     summary: str = "",
+    *,
+    score: int | None = None,
+    label: VerdictLabel | None = None,
 ) -> Verdict:
-    raw = compute_raw_score(evidence)
-    final = apply_correlation_bonuses(evidence, raw)
-    label = label_from_score(final)
+    """Build the final Verdict. `score` and `label` may be precomputed by
+    the caller (Pipeline.run) to avoid duplicating the score math; when
+    omitted they are computed here. Direct callers (tests, ad-hoc use)
+    can keep passing only evidence + detectors_run + latency_ms.
+    """
+    final = score if score is not None else apply_correlation_bonuses(evidence, compute_raw_score(evidence))
+    final_label = label if label is not None else label_from_score(final)
     confidence = confidence_from_evidence(evidence)
     mitre = sorted({m for e in evidence for m in e.mitre_techniques})
 
@@ -71,13 +78,13 @@ def build_verdict(
     # the first sentence boundary so the opener gets bolded + palette-
     # colored and the technical body becomes italic underneath.
     body = summary or "Verdict computed from evidence."
-    opener = LIFEGUARD_OPENERS.get(label, "")
+    opener = LIFEGUARD_OPENERS.get(final_label, "")
     full_summary = f"{opener} {body}" if opener else body
 
     return Verdict(
         request_id=str(uuid4()),
         score=final,
-        label=label,
+        label=final_label,
         confidence=confidence,
         summary=full_summary,
         evidence=evidence,

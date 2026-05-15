@@ -7,6 +7,7 @@ Three branches:
 """
 
 from backend.models.evidence import Evidence, Severity, Signal
+from backend.models.verdict import VerdictLabel
 from backend.pipeline import Pipeline
 
 
@@ -34,7 +35,7 @@ def test_v2_safe_variant_known_sender_with_auth():
         _ev(Signal.DKIM_VALID, Severity.INFO, "DKIM signature valid."),
     ]
     assert (
-        Pipeline._summarize(evidence)
+        Pipeline._summarize(evidence, VerdictLabel.SAFE)
         == "This sender matches the pattern you've seen from them before."
     )
 
@@ -47,7 +48,7 @@ def test_v2_safe_variant_new_sender_with_auth():
         _ev(Signal.FIRST_SEEN_SENDER, Severity.LOW, "First time seeing this sender."),
     ]
     assert (
-        Pipeline._summarize(evidence)
+        Pipeline._summarize(evidence, VerdictLabel.SAFE)
         == "This is the first email you've received from this sender, "
         "and their identity checks out."
     )
@@ -67,7 +68,7 @@ def test_v2_safe_variant_findings_exist():
         ),
     ]
     assert (
-        Pipeline._summarize(evidence)
+        Pipeline._summarize(evidence, VerdictLabel.SAFE)
         == "Some minor things turned up but nothing concerning."
     )
 
@@ -79,7 +80,7 @@ def test_v2_safe_variant_truly_clean():
         # DKIM_VALID missing -> Variant 1 doesn't apply
     ]
     assert (
-        Pipeline._summarize(evidence)
+        Pipeline._summarize(evidence, VerdictLabel.SAFE)
         == "Nothing in this email stood out as suspicious."
     )
 
@@ -101,7 +102,7 @@ def test_v2_safe_option_b_priority_relationship_wins_over_findings():
         ),
     ]
     assert (
-        Pipeline._summarize(evidence)
+        Pipeline._summarize(evidence, VerdictLabel.SAFE)
         == "This sender matches the pattern you've seen from them before."
     )
 
@@ -125,7 +126,7 @@ def test_v2_summarize_uses_llm_summary_body_when_present():
             details={"llm_summary_body": llm_body},
         ),
     ]
-    summary = Pipeline._summarize(evidence)
+    summary = Pipeline._summarize(evidence, VerdictLabel.MALICIOUS)
     assert summary == llm_body
 
 
@@ -139,13 +140,13 @@ def test_v2_summarize_falls_back_to_top_evidence_when_no_llm_body():
         ),
         _ev(Signal.DKIM_MISSING, Severity.MEDIUM, "No DKIM signature present."),
     ]
-    summary = Pipeline._summarize(evidence)
+    summary = Pipeline._summarize(evidence, VerdictLabel.SUSPICIOUS)
     assert summary == "Sender domain resembles brand X."
 
 
 def test_v2_summarize_empty_evidence_returns_default():
     """No evidence at all (pre-V1 behavior preserved)."""
-    summary = Pipeline._summarize([])
+    summary = Pipeline._summarize([], VerdictLabel.SAFE)
     assert summary == "No suspicious signals detected."
 
 
@@ -159,6 +160,6 @@ def test_v2_summarize_empty_llm_body_is_ignored():
             details={"llm_summary_body": ""},
         ),
     ]
-    summary = Pipeline._summarize(evidence)
+    summary = Pipeline._summarize(evidence, VerdictLabel.SAFE)
     # INFO-only with no SPF/DKIM -> Variant 4 fires
     assert summary == "Nothing in this email stood out as suspicious."

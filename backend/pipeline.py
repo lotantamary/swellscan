@@ -14,7 +14,7 @@ from backend.detectors.sender_baseline import SenderBaselineDetector
 from backend.detectors.urls import UrlsDetector
 from backend.models.email import Email
 from backend.models.evidence import Evidence, Severity, Signal
-from backend.models.verdict import Verdict
+from backend.models.verdict import Verdict, VerdictLabel
 from backend.scoring.aggregator import (
     apply_correlation_bonuses,
     build_verdict,
@@ -89,8 +89,8 @@ class Pipeline:
         evidence: list[Evidence] = [e for sub in results for e in sub]
         detectors_run = [d.name for d in self._cheap]
 
-        raw = compute_raw_score(evidence)
-        if raw >= LLM_INVOCATION_THRESHOLD:
+        raw_pre_llm = compute_raw_score(evidence)
+        if raw_pre_llm >= LLM_INVOCATION_THRESHOLD:
             try:
                 llm_ev = await self._llm.run_with_evidence(email, evidence)
                 # Task 31 fix: only count LLM as "consulted" when it
@@ -109,22 +109,30 @@ class Pipeline:
             except Exception as exc:
                 log.warning("llm_skipped", error=str(exc))
 
+        # Compute the official score and label ONCE per request. Threaded
+        # into both _summarize and build_verdict so the two paths cannot
+        # disagree on what the verdict label is.
+        final_score = apply_correlation_bonuses(evidence, compute_raw_score(evidence))
+        final_label = label_from_score(final_score)
+
         latency_ms = int((time.perf_counter() - t0) * 1000)
         return build_verdict(
             evidence=evidence,
             detectors_run=detectors_run,
             latency_ms=latency_ms,
-            summary=self._summarize(evidence),
+            summary=self._summarize(evidence, final_label),
+            score=final_score,
+            label=final_label,
         )
 
     @staticmethod
-    def _summarize(evidence: list[Evidence]) -> str:
+    def _summarize(evidence: list[Evidence], label: VerdictLabel) -> str:
         """V2.S8 body builder, V2.S10-fix-C label check, V2.S12 SAFE variants.
 
         Preference order:
           1. LLM-written body if any evidence has 'llm_summary_body' in details.
-          2. When the final verdict label would be SAFE, pick one of four
-             templated bodies based on which signals fired (variants 1-4 below).
+          2. When the final verdict label is SAFE, pick one of four templated
+             bodies based on which signals fired (variants 1-4 below).
           3. Fallback to the top evidence's explanation for SUSPICIOUS or
              MALICIOUS verdicts when the LLM didn't fire (V1 behavior).
         """
@@ -136,10 +144,7 @@ class Pipeline:
             if isinstance(body, str) and body.strip():
                 return body.strip()
 
-        final_score = apply_correlation_bonuses(
-            evidence, compute_raw_score(evidence)
-        )
-        if label_from_score(final_score) == "SAFE":
+        if label == VerdictLabel.SAFE:
             return _safe_template(evidence)
 
         top = sorted(
