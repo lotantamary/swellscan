@@ -168,7 +168,17 @@ class AnthropicClient:
         try:
             resp = await self._anth.messages.create(
                 model=self.MODEL,
-                max_tokens=400,
+                # Task 31 fix: was 400. Pydantic LLMVerdict.reasoning is
+                # 2000 chars; Claude needs proportional token headroom or
+                # the response gets truncated mid-JSON and Pydantic
+                # validation fails on "EOF while parsing". Caught on
+                # demo 6 (BEC thread-hijack) where Claude produced verbose
+                # reasoning covering three drift signals + payment pattern
+                # and ran out of tokens partway through summary_body.
+                # 1500 tokens fits a complete JSON object even with full
+                # 2000-char reasoning + 140-char summary_body + the other
+                # fields. ~$0.005 per call, unchanged in practice.
+                max_tokens=1500,
                 temperature=0,
                 system=system,
                 messages=[{"role": "user", "content": user}],

@@ -162,6 +162,58 @@ function clearSenderHistory() {
   Logger.log('UserProperties sender_history_v1 entry deleted.');
 }
 
+/**
+ * Targeted reset for the two demo seed entries only. Restores Anthropic
+ * and orbitalvendor.com baselines to their canonical pre-scan state
+ * without touching the rest of UserProperties.
+ *
+ * Use case: after the first scan of demo 6, the baseline updater wrote
+ * `gmail.com` (the BEC injected DKIM domain) into orbitalvendor's
+ * typical_signing_domains. On a second scan that pollution means
+ * SENDER_DOMAIN_DRIFT no longer fires - we'd lose the demo moment. Run
+ * this before re-rehearsing demo 6 to restore the clean baseline.
+ *
+ * Idempotent: re-running is safe. Other real-sender entries are
+ * preserved.
+ */
+function resetDemoSeeds() {
+  const props = PropertiesService.getUserProperties();
+  const existingBlob = props.getProperty(HISTORY_KEY);
+  let all = {};
+  if (existingBlob) {
+    try {
+      all = JSON.parse(existingBlob);
+    } catch (e) {
+      Logger.log('Existing blob unparseable, starting fresh: ' + e.message);
+      all = {};
+    }
+  }
+
+  // Canonical seed values (same as seedDemoHistory, kept in sync).
+  all['invoice+statements@mail.anthropic.com'] = {
+    from_address: 'invoice+statements@mail.anthropic.com',
+    first_seen: '2025-12-01T09:00:00Z',
+    messages_seen: 30,
+    typical_signing_domains: ['mail.anthropic.com'],
+    typical_ip_prefixes: ['54.240'],
+    typical_send_hours: [13, 14, 15, 16, 17, 18, 19, 20, 21],
+    last_messages: [],
+  };
+  all['accounts@orbitalvendor.com'] = {
+    from_address: 'accounts@orbitalvendor.com',
+    first_seen: '2025-09-01T09:00:00Z',
+    messages_seen: 30,
+    typical_signing_domains: ['orbitalvendor.com'],
+    typical_ip_prefixes: ['54.240'],
+    typical_send_hours: [13, 14, 15, 16, 17, 18, 19, 20, 21],
+    last_messages: [],
+  };
+
+  props.setProperty(HISTORY_KEY, JSON.stringify(all));
+  Logger.log('RESET canonical state for Anthropic + orbitalvendor seed entries.');
+  Logger.log('Total senders in history: ' + Object.keys(all).length);
+}
+
 function _seedMergeUnique(a, b) {
   const set = {};
   a.forEach(function (x) { set[String(x)] = x; });

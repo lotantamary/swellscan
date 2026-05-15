@@ -98,6 +98,7 @@ function resetDemoInbox() {
     '<swellscan-demo-4-injection-v1@demo.swellscan.io>',
     '<swellscan-demo-5-password-archive-v1@demo.swellscan.io>',
     '<swellscan-demo-6-bec-hijack-v1@demo.swellscan.io>',
+    '<swellscan-demo-6-bec-hijack-v2@demo.swellscan.io>',
     '<swellscan-demo-7-sanitization-v1@demo.swellscan.io>',
     '<swellscan-demo-8-pdfexe-v1@demo.swellscan.io>',
   ];
@@ -363,7 +364,18 @@ function buildDemo5_PasswordArchive() {
  * 2025-2026 BEC variant."
  */
 function buildDemo6_BecThreadHijack() {
-  var messageId = '<swellscan-demo-6-bec-hijack-v1@demo.swellscan.io>';
+  // Task 31 fix: body redesigned so URGENT sits within sentence-distance
+  // (<100 chars) of a payment-instruction word, satisfying the V2.S6 BEC
+  // detector's proximity check. v1's body had urgent and payment-pattern
+  // 3+ sentences apart so PAYMENT_INSTRUCTION_URGENCY didn't fire and
+  // the thread-hijack correlation rule (which requires that signal +
+  // SENDER_IP_GEOGRAPHY_CHANGE) consequently couldn't apply its +20 bonus.
+  // v2 body uses two paths into the BEC detector:
+  //   - Path 1: "change of banking details" standalone phrase (fires alone)
+  //   - Path 2: URGENT + wire payment within ~30 chars (proximity check)
+  // Message-ID bumped to v2 so a re-run of seedDemoInbox injects the new
+  // version without the idempotency check skipping it.
+  var messageId = '<swellscan-demo-6-bec-hijack-v2@demo.swellscan.io>';
   var date = new Date(Date.UTC(2026, 4, 14, 3, 17, 0));
 
   var authResults =
@@ -374,15 +386,15 @@ function buildDemo6_BecThreadHijack() {
 
   var bodyText =
     'Hi,\r\n\r\n' +
-    "Quick note - we've recently updated our banking details for incoming\r\n" +
-    'wire transfers. Please use the new IBAN below for the outstanding\r\n' +
-    'invoice on your account.\r\n\r\n' +
+    'URGENT: please wire payment for the outstanding invoice today.\r\n\r\n' +
+    "We've made a recent change of banking details for incoming wire\r\n" +
+    'transfers - the new IBAN is below. Please use this for the payment\r\n' +
+    'on your account.\r\n\r\n' +
     'New IBAN: GB29 NWBK 6016 1331 9268 19\r\n' +
     'SWIFT: NWBKGB2L\r\n' +
     'Account holder: Orbital Vendor Ltd.\r\n\r\n' +
-    'This payment is URGENT and needs to be processed by end of day today.\r\n' +
-    'Please confirm receipt of this update and let me know once the wire\r\n' +
-    'has been initiated.\r\n\r\n' +
+    'Please confirm receipt and let me know once the wire has been\r\n' +
+    'initiated by end of day.\r\n\r\n' +
     'Thanks,\r\n' +
     'Accounts\r\n' +
     'Orbital Vendor';
