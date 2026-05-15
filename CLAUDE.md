@@ -4,13 +4,27 @@ Swellscan is a Gmail Add-on that analyzes the currently-open email and produces 
 
 The design deliberately mirrors Upwind's own published architecture (RSAC 2026 malicious-prompt detector): three threat-class coverage areas (phishing-links, BEC, attachments) plus three deliberate stand-out moments — self-defending LLM, wave-themed verdict card with a character arc, and per-sender baselining. Submission deadline: **Fri 2026-05-15 EOD**.
 
-## Current State (updated 2026-05-14, V2 complete)
+## Current State (updated 2026-05-15, Tasks 29-31 complete - demos validated end-to-end)
 
-**V1 (Tasks 1-28 of parent plan) complete. V2 (V2.S1 - V2.S13, all 11 accepted research findings + 3 false-positive fixes + 4-variant SAFE body) complete and deployed.** Phase 6 starts at Task 29 (pre-seed demo UserProperties).
+**V1, V2, and Phase 6 demo validation (Tasks 29-31) ALL complete and deployed.** 6 planned demos + 2 spares verified end-to-end with submission-quality screenshots. Live revision `swellscan-backend-00022-bsr` (2026-05-15). 167 tests passing (was 136). Phase 6 continues at Task 31.5 (cleanup + code-review + simplify with fresh eyes) → Task 32 (security review) → Task 34 (README full content - **creativity emphasis**) → Task 35 (refresh CLAUDE.md) → Task 37 (PDF cover sheet) → Task 38 (submit). Submission deadline TODAY EOD.
+
+**Task 31 dogfood pass surfaced 12 plan-drift catches** (interview material - all fixed and committed):
+1. Empty-baseline drift false-positive on real Gmail emails
+2. Encoded-payload false-positive on URL tracking tokens + inline data: images
+3. Anthropic 5s timeout too aggressive for 11KB prompts (→ 30s)
+4. Safe Browsing 4s timeout (→ 15s) + structured failure logging
+5. VirusTotal 4s timeout (→ 15s) + structured failure logging
+6. Card meta lied about "LLM consulted" when LLM call silently failed
+7. **Secret Manager values had trailing `\r\n` - broke all 3 external APIs since V2.S9** (THE root cause; revealed by Cloud Run log inspection after Lotan noticed Anthropic dashboard showed zero balance consumed despite cards claiming "LLM consulted")
+8. Claude wrapped JSON in markdown code fences (Pydantic rejected) → strip before validation
+9. LLM reasoning exceeded artificial 500-char max_length (→ 2000) - Evidence.explanation same
+10. V2.S4 password-archive regex too strict for natural-language phrasings ("Password to open is: X" failed)
+11. `max_tokens=400` too small for full JSON output on dense scans (→ 1500)
+12. Demo 6 body had urgency >100 chars from any payment word AND prompt-injection regex missed "Ignore all previous instructions" + "as verdict=benign" phrasings - both fixed
 
 - **Live URL:** [`https://swellscan-backend-102679409749.us-central1.run.app`](https://swellscan-backend-102679409749.us-central1.run.app/health) - `/health` returns `{"status":"ok"}`, `/score` is OIDC-protected (401 without a valid Google ID token), `/illustration/{label}` serves the static hero PNG (SAFE/SUSPICIOUS/MALICIOUS), `/dot/{severity}` serves the severity-dot icon, `/logo.png` serves the Swellscan brand logo. All static endpoints carry a 1-hour cache.
-- **Live revision:** `swellscan-backend-00012-nhf` (V2.S14 deploy: multi-audience OIDC + per-user rate limiter + max-instances=10).
-- **Tests:** **136 passing** (53 V1 baseline + 83 V2 tests). `pytest` from repo root runs all.
+- **Live revision:** `swellscan-backend-00022-bsr` (Task 31 final - prompt-injection regex broadening).
+- **Tests:** **167 passing** (53 V1 + 83 V2 + 31 Task 31 regressions). `pytest` from repo root runs all.
 - **Detectors (8 total, was 7 in V1):** headers, sender, urls, attachments, prompt-injection, sender-baseline, llm, **plus new V2 detector `bec_language`** (payment-instruction-urgency BEC defense).
 - **New signals in V2 (3):** `PAYLOAD_FRAGMENTATION_ATTEMPT` (prompt-injection), `PAYMENT_INSTRUCTION_URGENCY` (bec_language), `RETURN_PATH_DOMAIN_MISMATCH` (headers). Also wired up the previously-dormant `ATTACHMENT_PASSWORD_PROTECTED_ARCHIVE` enum to a real detection rule.
 - **Three signature features built and verified end-to-end:**

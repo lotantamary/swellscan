@@ -2,7 +2,7 @@
 
 This file is the briefing for any AI session picking up Swellscan mid-implementation. The same text gets pasted into the chat when starting a fresh session for maximum first-turn compliance. The on-disk copy exists as (1) a mid-session memory refresh, (2) a starting point for short future-session prompts, and (3) project documentation.
 
-**Last updated: 2026-05-14, after V2 backend complete + 3 false-positive fixes + 4-variant SAFE bodies + V2.S14 multi-audience OIDC + per-user rate limiter live. Next session opens at Task 29 (pre-seed demo UserProperties).**
+**Last updated: 2026-05-15 (submission day), end of "V2 deploy + demo validation" session. Tasks 29, 30, 30.5, 31 ALL COMPLETE. Live revision `swellscan-backend-00021-8zn`. 6 planned demos + 2 spares all verified end-to-end with screenshots. 11 dogfood-caught plan-drift fixes during demo pass (see memory `session_v2_deploy_demo_validation.md`). Next session opens at Task 31.5 (cleanup + code-review with fresh eyes) followed by Task 32 (security review), Task 34 (README - creativity emphasis), Task 35 (CLAUDE.md refresh), Task 37 (PDF), Task 38 (SUBMIT).**
 
 ---
 
@@ -121,12 +121,12 @@ The ones most important to read FIRST for the upcoming work:
 ## CURRENT STATE OF THE CODE
 ═══════════════════════════════════════════════════════════════════════
 
-  **V1 (Tasks 1-28 of parent plan) complete. V2 (V2.S1 - V2.S14) complete and live in production.** Next: Task 29 (pre-seed demo UserProperties) in the parent plan.
+  **V1 + V2 + Phase 6 demo validation (Tasks 29, 30, 30.5, 31) ALL complete.** Next: Task 31.5 (cleanup + code-review with fresh eyes) → Task 32 (security review) → Task 34 (README full content - **creativity emphasis**) → Task 35 (refresh CLAUDE.md) → Task 37 (PDF cover sheet) → Task 38 (submit). Submission deadline TODAY 2026-05-15 EOD.
 
-  Backend status: BUILT, TESTED, DEPLOYED at V2 state. **136 tests passing** (53 V1 baseline + 83 V2 tests).
+  Backend status: BUILT, TESTED, DEPLOYED at Task 31 state. **167 tests passing** (53 V1 baseline + 83 V2 + 31 Task 31 regression tests).
 
     Live URL: https://swellscan-backend-102679409749.us-central1.run.app
-    Live revision: swellscan-backend-00012-nhf  (V2.S14 deploy, 2026-05-14)
+    Live revision: swellscan-backend-00022-bsr  (Task 31 final - prompt-injection regex broadening, 2026-05-15)
     /health                  → {"status":"ok"}
     POST /score              → OIDC-protected (401 on bad tokens)
     /illustration/{label}    → static PNG, 1-hour cache
@@ -262,7 +262,7 @@ These came up during V2.S10-V2.S14 and need to land in the README. They are NOT 
 ## IMMEDIATE NEXT ACTION
 ═══════════════════════════════════════════════════════════════════════
 
-Start at Task 29 (pre-seed demo Gmail's UserProperties for the per-sender-baseline detector demo). Default skill: `superpowers:executing-plans`. Commit + push after every task.
+Start at Task 31.5 (mid-build cleanup: invoke `simplify` skill + `code-review:code-review` skill with fresh eyes). All demo cards are screenshotted. The MAIN priority for the new session is the cleanup + README - and the README MUST emphasize creativity (the wow moments) and substantiate Swellscan's edge over a simple email-scanner product. Code review should flag the prompt_injection regex narrowness, the `[198.51` IP-prefix cosmetic bug (leading bracket from `X-Originating-IP: [...]`), and the "HIGH conf" semantic ambiguity. After cleanup: Task 32 (pip-audit + security-review), Task 34 (README full content), Task 35 (refresh CLAUDE.md), Task 37 (PDF cover sheet), Task 38 (submit to ou-bootcamp-interviewers@upwind.io). Default skill: `superpowers:executing-plans`. Commit + push after every task. DO NOT re-scan demo 6 v2 without first running `resetDemoSeeds()` - the baseline updater pollutes orbitalvendor's typical_signing_domains after each scan, killing the drift moment on subsequent scans. Before live demo with Bar Naor: run `resetDemoSeeds` once.
 
 Git authorship is already configured correctly. Commits should be authored as my personal identity WITHOUT a Co-Authored-By trailer (commits should look like my own work on GitHub).
 
