@@ -43,7 +43,15 @@ class UrlscanClient:
         the impact of a noisier-than-consensus signal.
         """
         try:
-            q = quote(f"page.url:{url}", safe="")
+            # urlscan's query parser uses ':' as a field-selector delimiter.
+            # A URL like https://x/ would be parsed as `page.url:https` plus
+            # the remainder, matching nothing. Wrapping the URL in double
+            # quotes makes urlscan treat the colons as part of the value.
+            # Defensive: strip any literal double quotes from the URL since
+            # they aren't legal in URL syntax and would otherwise terminate
+            # the quoted value prematurely.
+            quoted_url = f'"{url.replace(chr(34), "")}"'
+            q = quote(f"page.url:{quoted_url}", safe="")
             resp = await self._http.get(
                 f"{self.BASE}/search/?q={q}",
                 headers=(

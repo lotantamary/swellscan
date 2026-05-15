@@ -117,3 +117,37 @@ async def test_unrelated_tag_does_not_fire():
     client = UrlscanClient(http_client=http)
     result = await client.search_existing("https://example.test/")
     assert result["verdict"] is False
+
+
+@pytest.mark.asyncio
+async def test_query_wraps_url_in_quotes():
+    """Bug discovered during live demo prep: urlscan's query parser uses
+    ':' as the field-selector delimiter, so an unquoted https URL like
+    `page.url:https://x/` is parsed as `page.url:https` plus the remainder
+    and matches nothing. The wrapper must wrap URLs in double quotes so
+    colons in the value are preserved.
+    """
+    http = _mock_http({"results": []})
+    client = UrlscanClient(http_client=http)
+    await client.search_existing("https://example.test/path")
+    # Inspect the URL the wrapper actually requested
+    call_url = http.get.call_args[0][0]
+    # The double-quote character (%22 URL-encoded) MUST surround the URL
+    assert "%22https" in call_url
+    assert "test%2Fpath%22" in call_url
+
+
+@pytest.mark.asyncio
+async def test_query_strips_literal_double_quotes_from_url():
+    """Defensive: a URL carrying a literal double quote would otherwise
+    terminate the quoted value early. Real URLs cannot legally contain
+    them, but a malicious input should not be able to break the query.
+    """
+    http = _mock_http({"results": []})
+    client = UrlscanClient(http_client=http)
+    await client.search_existing('https://evil.test/"injected"')
+    call_url = http.get.call_args[0][0]
+    # No literal-quote bytes (raw or percent-encoded) inside the URL value
+    # after the leading wrapper quote.
+    # We allow the wrapping %22 around the value but not extras inside.
+    assert call_url.count("%22") == 2
