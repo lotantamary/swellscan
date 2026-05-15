@@ -109,3 +109,68 @@ async def test_domain_match_via_header_i_format_no_drift():
     )
     evs = await SenderBaselineDetector().run(email)
     assert not any(e.signal == Signal.SENDER_DOMAIN_DRIFT for e in evs)
+
+
+@pytest.mark.asyncio
+async def test_send_time_in_range_does_not_fire():
+    """Task 31.5 fix: an hour INSIDE the observed [min, max] window must
+    not fire SENDER_SEND_TIME_ANOMALY. The pre-fix set-membership check
+    would have fired on hour 10 against observed hours {9, 14, 17} since
+    10 isn't literally in the recorded set."""
+    history = SenderHistory(
+        from_address="ceo@company.com",
+        first_seen=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        messages_seen=20,
+        typical_signing_domains=["company.com"],
+        typical_send_hours=[9, 14, 17],  # range = [9, 17]
+    )
+    email = make_email(
+        from_address="ceo@company.com",
+        auth_results="dkim=pass header.d=company.com",
+        sender_history=history,
+        received_at=datetime(2026, 5, 14, 10, 30, tzinfo=timezone.utc),  # 10:30, in range
+    )
+    evs = await SenderBaselineDetector().run(email)
+    assert not any(e.signal == Signal.SENDER_SEND_TIME_ANOMALY for e in evs)
+
+
+@pytest.mark.asyncio
+async def test_send_time_outside_range_fires():
+    """An hour OUTSIDE the observed [min, max] window fires the signal."""
+    history = SenderHistory(
+        from_address="ceo@company.com",
+        first_seen=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        messages_seen=20,
+        typical_signing_domains=["company.com"],
+        typical_send_hours=[9, 10, 11, 14, 15, 16, 17],  # range = [9, 17]
+    )
+    email = make_email(
+        from_address="ceo@company.com",
+        auth_results="dkim=pass header.d=company.com",
+        sender_history=history,
+        received_at=datetime(2026, 5, 14, 3, 17, tzinfo=timezone.utc),  # 03:17, outside
+    )
+    evs = await SenderBaselineDetector().run(email)
+    assert any(e.signal == Signal.SENDER_SEND_TIME_ANOMALY for e in evs)
+
+
+@pytest.mark.asyncio
+async def test_send_time_anomaly_requires_min_3_observations():
+    """A sender with fewer than 3 recorded hours doesn't have enough
+    data to define a meaningful send-time window - signal stays silent
+    rather than false-positiving on every fresh sender's first few scans."""
+    history = SenderHistory(
+        from_address="ceo@company.com",
+        first_seen=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        messages_seen=2,
+        typical_signing_domains=["company.com"],
+        typical_send_hours=[9, 17],  # only 2 observations
+    )
+    email = make_email(
+        from_address="ceo@company.com",
+        auth_results="dkim=pass header.d=company.com",
+        sender_history=history,
+        received_at=datetime(2026, 5, 14, 3, 17, tzinfo=timezone.utc),
+    )
+    evs = await SenderBaselineDetector().run(email)
+    assert not any(e.signal == Signal.SENDER_SEND_TIME_ANOMALY for e in evs)

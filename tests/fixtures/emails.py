@@ -26,13 +26,14 @@ def make_email(
     sender_ip: str = "209.85.220.42",
     message_id: str = "msg-001",
     message_id_header: str = "<msg-001@example.com>",
+    received_at: datetime | None = None,
 ) -> Email:
     return Email(
         message_id=message_id,
         **{"from": Sender(display_name=from_name, address=from_address)},
         to=["lotan@example.com"],
         subject=subject,
-        received_at=datetime(2026, 5, 12, 14, 0, 0, tzinfo=timezone.utc),
+        received_at=received_at or datetime(2026, 5, 12, 14, 0, 0, tzinfo=timezone.utc),
         headers=EmailHeaders(
             authentication_results=auth_results,
             return_path=return_path,

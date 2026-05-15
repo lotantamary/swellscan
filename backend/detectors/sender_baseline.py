@@ -67,10 +67,22 @@ class SenderBaselineDetector(Detector):
                 )
             )
 
-        # send-time anomaly
-        if history.typical_send_hours:
+        # send-time anomaly. Fires only when the current hour is OUTSIDE the
+        # [min, max] range of observed hours, AND we have at least 3 distinct
+        # observations to define a range from. Task 31.5 security-review fix:
+        # the previous implementation used set-membership against the raw
+        # list of observed hours, which false-positives on every business
+        # hour different from a previously-observed one (e.g., a sender whose
+        # history records {9, 14, 17} would fire on 10am, 11am, 15am - well
+        # inside business hours). Design doc §3.3 describes this signal as a
+        # range check ("3 AM outside business hours"); the range semantic
+        # honors that. Storage shape (a list of observed hours) is unchanged
+        # so seeded demo histories stay valid.
+        if history.typical_send_hours and len(history.typical_send_hours) >= 3:
             current_hour = email.received_at.hour
-            if current_hour not in history.typical_send_hours:
+            min_hour = min(history.typical_send_hours)
+            max_hour = max(history.typical_send_hours)
+            if current_hour < min_hour or current_hour > max_hour:
                 out.append(
                     Evidence(
                         signal=Signal.SENDER_SEND_TIME_ANOMALY,
@@ -78,12 +90,12 @@ class SenderBaselineDetector(Detector):
                         confidence=0.7,
                         explanation=(
                             f"Email arrived at {current_hour:02d}:00 - outside this sender's typical "
-                            f"send hours ({sorted(history.typical_send_hours)})."
+                            f"send window ({min_hour:02d}:00 to {max_hour:02d}:00)."
                         ),
                         mitre_techniques=["T1656"],
                         details={
                             "hour": current_hour,
-                            "typical": history.typical_send_hours,
+                            "typical_window": [min_hour, max_hour],
                         },
                         detector=self.name,
                     )
