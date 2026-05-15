@@ -42,3 +42,13 @@ desktop.ini
 
 # --- Superpowers brainstorming companion (visual mockups, not source) ---
 .superpowers/
+
+# --- AI-session collaboration files (kept local, never public) ---
+.claude/
+CLAUDE.md
+
+# --- Demo plumbing (local-only seed + inbox-injector helpers) ---
+demo-plumbing/
+
+# --- Internal implementation plans (working notes; specs/ stays public) ---
+docs/superpowers/plans/
